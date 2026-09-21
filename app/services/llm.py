@@ -40,3 +40,28 @@ class LLMService:
         response.raise_for_status()
 
         return json.loads(response.json()["response"])
+
+    def generate_with_tools(
+        self,
+        prompt: str,
+        tools: list[dict],
+    ) -> dict:
+        response = requests.post(
+            f"{self.base_url}/api/chat",
+            json={
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                "tools": tools,
+                "stream": False,
+            },
+            timeout=120,
+        )
+
+        response.raise_for_status()
+
+        return response.json()
