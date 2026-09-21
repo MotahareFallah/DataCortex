@@ -84,3 +84,111 @@ def test_select_with_cte_is_allowed():
         ") "
         "SELECT * FROM product_data"
     )
+
+
+def test_select_from_existing_table_is_allowed():
+    schema = {
+        "products": {"id", "name"},
+        "orders": {"id", "total_amount"},
+    }
+
+    validate_sql(
+        "SELECT id, name FROM products",
+        schema,
+    )
+
+
+def test_select_from_non_existing_table_is_rejected():
+    schema = {
+        "products": {"id", "name"},
+        "orders": {"id", "total_amount"},
+    }
+
+    with pytest.raises(UnsafeSQLQueryError):
+        validate_sql(
+            "SELECT id, name FROM customers",
+            schema,
+        )
+
+
+def test_select_existing_column_is_allowed():
+    schema = {
+        "products": {"id", "name"},
+        "orders": {"id", "total_amount"},
+    }
+
+    validate_sql(
+        "SELECT name FROM products",
+        schema,
+    )
+
+
+def test_select_non_existing_column_is_rejected():
+    schema = {
+        "products": {"id", "name"},
+        "orders": {"id", "total_amount"},
+    }
+
+    with pytest.raises(UnsafeSQLQueryError):
+        validate_sql(
+            "SELECT price FROM products",
+            schema,
+        )
+
+
+def test_select_multiple_existing_columns_is_allowed():
+    schema = {
+        "products": {"id", "name", "price"},
+        "orders": {"id", "total_amount"},
+    }
+
+    validate_sql(
+        "SELECT id, name, price FROM products",
+        schema,
+    )
+
+
+def test_select_one_non_existing_column_among_multiple_is_rejected():
+    schema = {
+        "products": {"id", "name", "price"},
+        "orders": {"id", "total_amount"},
+    }
+
+    with pytest.raises(UnsafeSQLQueryError):
+        validate_sql(
+            "SELECT id, name, stock FROM products",
+            schema,
+        )
+
+
+def test_valid_join_is_allowed():
+    schema = {
+        "products": {"id", "name"},
+        "orders": {"id", "product_id"},
+    }
+
+    validate_sql(
+        """
+        SELECT products.name, orders.id
+        FROM products
+        JOIN orders ON products.id = orders.product_id
+        """,
+        schema,
+    )
+
+
+def test_invalid_join_column_is_rejected():
+    schema = {
+        "products": {"id", "name"},
+        "orders": {"id", "product_id"},
+    }
+
+    with pytest.raises(UnsafeSQLQueryError):
+        validate_sql(
+            """
+            SELECT products.name, orders.id
+            FROM products
+            JOIN orders ON products.id = orders.customer_id
+            """,
+            schema,
+        )
