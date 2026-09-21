@@ -1,6 +1,9 @@
-import pytest
+from unittest.mock import Mock, patch
 
-from app.database.query import execute_query
+import pytest
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.database.query import SQLExecutionError, execute_query
 from app.database.sql_validator import UnsafeSQLQueryError
 
 
@@ -86,3 +89,27 @@ def test_execute_query_allows_select():
 def test_execute_query_rejects_unsafe_sql():
     with pytest.raises(UnsafeSQLQueryError):
         execute_query("DROP TABLE products")
+
+
+@patch("app.database.query.engine.connect")
+def test_execute_query_raises_execution_error(mock_connect):
+    mock_connection = Mock()
+    mock_connection.execute.side_effect = SQLAlchemyError("database error")
+    mock_connect.return_value.__enter__.return_value = mock_connection
+
+    with pytest.raises(SQLExecutionError, match="Failed to execute SQL query."):
+        execute_query("SELECT * FROM orders")
+
+
+@patch("app.database.query.engine.connect")
+def test_execute_query_preserves_original_database_error(mock_connect):
+    original_error = SQLAlchemyError("database error")
+
+    mock_connection = Mock()
+    mock_connection.execute.side_effect = original_error
+    mock_connect.return_value.__enter__.return_value = mock_connection
+
+    with pytest.raises(SQLExecutionError) as exc_info:
+        execute_query("SELECT * FROM orders")
+
+    assert exc_info.value.__cause__ is original_error

@@ -1,5 +1,8 @@
 from unittest.mock import patch
 
+import pytest
+
+from app.database.query import SQLExecutionError
 from app.schemas.query import QueryResult
 from app.services.ai_query import AIQueryService
 
@@ -73,3 +76,57 @@ def test_ai_query_passes_schema_to_text_to_sql(
         question="How many customers are there?",
         schema=schema,
     )
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.TextToSQLService")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_raises_error_when_generated_sql_fails(
+    mock_schema,
+    mock_text_to_sql,
+    mock_execute_query,
+):
+    mock_schema.return_value.model_dump_json.return_value = (
+        '{"orders": {"columns": ["total_amount"]}}'
+    )
+
+    mock_text_to_sql.return_value.generate_sql.return_value = (
+        "SELECT invalid_column FROM orders"
+    )
+
+    mock_execute_query.side_effect = SQLExecutionError("Failed to execute SQL query.")
+
+    service = AIQueryService()
+
+    with pytest.raises(
+        SQLExecutionError,
+        match="AI-generated SQL query failed to execute.",
+    ):
+        service.query("What are the total sales?")
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.TextToSQLService")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_preserves_original_execution_error(
+    mock_schema,
+    mock_text_to_sql,
+    mock_execute_query,
+):
+    mock_schema.return_value.model_dump_json.return_value = (
+        '{"orders": {"columns": ["total_amount"]}}'
+    )
+
+    mock_text_to_sql.return_value.generate_sql.return_value = (
+        "SELECT invalid_column FROM orders"
+    )
+
+    original_error = SQLExecutionError("Failed to execute SQL query.")
+    mock_execute_query.side_effect = original_error
+
+    service = AIQueryService()
+
+    with pytest.raises(SQLExecutionError) as exc_info:
+        service.query("What are the total sales?")
+
+    assert exc_info.value.__cause__ is original_error

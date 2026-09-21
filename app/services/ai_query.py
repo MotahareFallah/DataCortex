@@ -1,4 +1,4 @@
-from app.database.query import execute_query
+from app.database.query import SQLExecutionError, execute_query
 from app.database.schema import discover_schema
 from app.schemas.ai_query import AIQueryResponse
 from app.services.sql_cleaner import clean_sql
@@ -19,7 +19,12 @@ class AIQueryService:
 
         sql = clean_sql(sql)
 
-        result = execute_query(sql)
+        try:
+            result = execute_query(sql)
+        except SQLExecutionError as exc:
+            raise SQLExecutionError(
+                "AI-generated SQL query failed to execute."
+            ) from exc
 
         return AIQueryResponse(
             question=question,
