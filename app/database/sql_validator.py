@@ -1,4 +1,5 @@
-import re
+import sqlglot
+from sqlglot import exp
 
 
 class UnsafeSQLQueryError(ValueError):
@@ -6,30 +7,20 @@ class UnsafeSQLQueryError(ValueError):
 
 
 def validate_sql(sql: str) -> None:
-    normalized_sql = sql.strip().lower()
+    sql = sql.strip()
 
-    if not normalized_sql:
+    if not sql:
         raise UnsafeSQLQueryError("SQL query cannot be empty.")
 
-    if not normalized_sql.startswith("select"):
-        raise UnsafeSQLQueryError("Only SELECT queries are allowed.")
+    try:
+        statements = sqlglot.parse(sql, read="postgres")
+    except sqlglot.errors.ParseError as exc:
+        raise UnsafeSQLQueryError("Invalid SQL query.") from exc
 
-    if ";" in normalized_sql.rstrip(";"):
+    if len(statements) != 1:
         raise UnsafeSQLQueryError("Multiple SQL statements are not allowed.")
 
-    forbidden_keywords = [
-        "insert",
-        "update",
-        "delete",
-        "drop",
-        "alter",
-        "truncate",
-        "create",
-        "grant",
-    ]
+    statement = statements[0]
 
-    for keyword in forbidden_keywords:
-        pattern = rf"\b{re.escape(keyword)}\b"
-
-        if re.search(pattern, normalized_sql):
-            raise UnsafeSQLQueryError(f"SQL keyword '{keyword}' is not allowed.")
+    if not isinstance(statement, exp.Select):
+        raise UnsafeSQLQueryError("Only SELECT queries are allowed.")
