@@ -1,5 +1,11 @@
+from pydantic import BaseModel
+
 from app.services.llm import LLMService
 from app.services.sql_prompt import build_sql_prompt
+
+
+class SQLGenerationResult(BaseModel):
+    sql: str
 
 
 class TextToSQLService:
@@ -12,4 +18,8 @@ class TextToSQLService:
             schema=schema,
         )
 
-        return self.llm.generate(prompt).strip()
+        result = self.llm.generate_json(prompt)
+
+        structured_result = SQLGenerationResult.model_validate(result)
+
+        return structured_result.sql.strip()
