@@ -13,3 +13,4 @@ class AIQueryResponse(BaseModel):
     columns: list[str]
     rows: list[dict[str, Any]]
     row_count: int
+    answer: str

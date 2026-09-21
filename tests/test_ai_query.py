@@ -130,3 +130,63 @@ def test_ai_query_preserves_original_execution_error(
         service.query("What are the total sales?")
 
     assert exc_info.value.__cause__ is original_error
+
+
+def test_ai_query_service_generates_answer():
+    with (
+        patch("app.services.ai_query.discover_schema") as mock_schema,
+        patch("app.services.ai_query.TextToSQLService") as mock_text_to_sql,
+        patch("app.services.ai_query.AnswerService") as mock_answer_service,
+        patch("app.services.ai_query.execute_query") as mock_execute,
+    ):
+        mock_schema.return_value.model_dump_json.return_value = "{}"
+
+        mock_text_to_sql.return_value.generate_sql.return_value = (
+            "SELECT SUM(total_amount) AS total_sales FROM orders"
+        )
+
+        mock_execute.return_value.columns = ["total_sales"]
+        mock_execute.return_value.rows = [{"total_sales": "1022033.54"}]
+        mock_execute.return_value.row_count = 1
+
+        mock_answer_service.return_value.generate_answer.return_value = (
+            "The total sales are 1,022,033.54."
+        )
+
+        service = AIQueryService()
+
+        result = service.query("What are the total sales?")
+
+        assert result.answer == "The total sales are 1,022,033.54."
+
+
+def test_ai_query_service_passes_query_result_to_answer_service():
+    with (
+        patch("app.services.ai_query.discover_schema") as mock_schema,
+        patch("app.services.ai_query.TextToSQLService") as mock_text_to_sql,
+        patch("app.services.ai_query.AnswerService") as mock_answer_service,
+        patch("app.services.ai_query.execute_query") as mock_execute,
+    ):
+        mock_schema.return_value.model_dump_json.return_value = "{}"
+
+        mock_text_to_sql.return_value.generate_sql.return_value = (
+            "SELECT SUM(total_amount) AS total_sales FROM orders"
+        )
+
+        mock_execute.return_value.columns = ["total_sales"]
+        mock_execute.return_value.rows = [{"total_sales": "1022033.54"}]
+        mock_execute.return_value.row_count = 1
+
+        mock_answer_service.return_value.generate_answer.return_value = (
+            "The total sales are 1,022,033.54."
+        )
+
+        service = AIQueryService()
+
+        service.query("What are the total sales?")
+
+        mock_answer_service.return_value.generate_answer.assert_called_once_with(
+            question="What are the total sales?",
+            columns=["total_sales"],
+            rows=[{"total_sales": "1022033.54"}],
+        )
