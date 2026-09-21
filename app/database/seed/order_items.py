@@ -26,7 +26,7 @@ def seed_order_items() -> None:
             connection.execute(
                 text(
                     """
-                SELECT id, price
+                SELECT id
                 FROM products
                 ORDER BY id
                 """
@@ -38,7 +38,9 @@ def seed_order_items() -> None:
 
         for order in orders:
             subtotal = Decimal(str(order["subtotal"]))
-            first_line_total = (subtotal * Decimal("0.4")).quantize(Decimal("0.01"))
+
+            first_line_total = (subtotal * Decimal("0.40")).quantize(Decimal("0.01"))
+
             second_line_total = subtotal - first_line_total
 
             selected_products = random.sample(products, 2)
@@ -53,15 +55,9 @@ def seed_order_items() -> None:
                 line_totals,
                 strict=True,
             ):
-                quantity = random.randint(1, 5)
-                unit_price = Decimal(str(product["price"]))
-
-                gross_amount = (unit_price * quantity).quantize(Decimal("0.01"))
-
-                discount_amount = max(
-                    Decimal("0"),
-                    gross_amount - line_total,
-                ).quantize(Decimal("0.01"))
+                quantity = 1
+                unit_price = line_total
+                discount_amount = Decimal("0.00")
 
                 connection.execute(
                     text(
