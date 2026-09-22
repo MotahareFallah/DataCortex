@@ -13,6 +13,9 @@ class DatabaseAdapter:
     def placeholder(self) -> str:
         return self.dialect.placeholder()
 
+    def apply_limit(self, sql: str, limit: int) -> str:
+        return self.dialect.apply_limit(sql, limit)
+
 
 def get_database_adapter(database_type: str) -> DatabaseAdapter:
     dialects = {
