@@ -2,19 +2,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "DataCortex"
-    app_version: str = "0.1.0"
+    app_name: str
+    app_version: str
 
     postgres_db: str
     postgres_user: str
     postgres_password: str
-    postgres_host: str = "localhost"
-    postgres_port: int = 5432
+    postgres_host: str
+    postgres_port: int
 
-    openai_api_key: str
-
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5-coder:1.5b"
+    ollama_base_url: str
+    ollama_model: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
