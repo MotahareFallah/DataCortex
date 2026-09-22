@@ -1,23 +1,26 @@
 from app.database.query import SQLExecutionError, execute_query
 from app.database.schema import discover_schema
 from app.schemas.ai_query import AIQueryResponse
+from app.services.agent import AIAgent
 from app.services.answer import AnswerService
 from app.services.sql_cleaner import clean_sql
-from app.services.text_to_sql import TextToSQLService
+from app.services.sql_prompt import build_sql_prompt
 
 
 class AIQueryService:
     def __init__(self) -> None:
-        self.text_to_sql = TextToSQLService()
+        self.agent = AIAgent()
         self.answer = AnswerService()
 
     def query(self, question: str) -> AIQueryResponse:
         schema = discover_schema().model_dump_json(indent=2)
 
-        sql = self.text_to_sql.generate_sql_with_tool(
+        prompt = build_sql_prompt(
             question=question,
             schema=schema,
         )
+
+        sql = self.agent.run(prompt)
 
         sql = clean_sql(sql)
 
