@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     )
 
     @property
+    def database_type(self) -> str:
+        return "postgresql"
+
+    @property
     def database_url(self) -> str:
         return (
             f"postgresql+psycopg://"

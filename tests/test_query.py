@@ -189,3 +189,65 @@ def test_execute_query_rejects_unknown_column():
         match="Column 'unknown_column' does not exist in the schema.",
     ):
         execute_query("SELECT unknown_column FROM products")
+
+
+@patch("app.database.query.engine.connect")
+@patch("app.database.query.discover_schema")
+def test_execute_query_accepts_maximum_allowed_rows(
+    mock_discover_schema,
+    mock_connect,
+):
+    mock_discover_schema.return_value.tables = {
+        "orders": Mock(
+            columns=[
+                FakeColumn("id"),
+            ]
+        )
+    }
+
+    mock_connection = Mock()
+    mock_result = Mock()
+
+    mock_result.keys.return_value = ["id"]
+    mock_result.mappings.return_value.all.return_value = [
+        {"id": index} for index in range(1000)
+    ]
+
+    mock_connection.execute.return_value = mock_result
+    mock_connect.return_value.__enter__.return_value = mock_connection
+
+    result = execute_query("SELECT id FROM orders")
+
+    assert result.row_count == 1000
+
+
+@patch("app.database.query.engine.connect")
+@patch("app.database.query.discover_schema")
+def test_execute_query_rejects_too_many_rows(
+    mock_discover_schema,
+    mock_connect,
+):
+    mock_discover_schema.return_value.tables = {
+        "orders": Mock(
+            columns=[
+                FakeColumn("id"),
+            ]
+        )
+    }
+
+    mock_connection = Mock()
+    mock_result = Mock()
+
+    mock_result.keys.return_value = ["id"]
+    mock_result.mappings.return_value.all.return_value = [
+        {"id": index} for index in range(1001)
+    ]
+
+    mock_connection.execute.return_value = mock_result
+    mock_connect.return_value.__enter__.return_value = mock_connection
+
+    with pytest.raises(
+        ValueError,
+        match="Query returned too many rows",
+    ):
+        execute_query("SELECT id FROM orders")
