@@ -119,7 +119,7 @@ def test_execute_query_uses_sql_text(
 
     executed_argument = mock_connection.execute.call_args.args[0]
 
-    assert str(executed_argument) == "SELECT id FROM orders"
+    assert str(executed_argument) == "SELECT id FROM orders LIMIT 1000"
 
 
 @patch("app.database.query.engine.connect")
@@ -251,3 +251,53 @@ def test_execute_query_rejects_too_many_rows(
         match="Query returned too many rows",
     ):
         execute_query("SELECT id FROM orders")
+
+
+@patch("app.database.query.engine.connect")
+@patch("app.database.query.discover_schema")
+def test_execute_query_applies_security_row_limit(
+    mock_discover_schema,
+    mock_connect,
+):
+    mock_discover_schema.return_value.tables = {
+        "orders": Mock(columns=[FakeColumn("id")])
+    }
+
+    mock_connection = Mock()
+    mock_result = Mock()
+    mock_result.keys.return_value = ["id"]
+    mock_result.mappings.return_value.all.return_value = [{"id": 1}]
+
+    mock_connection.execute.return_value = mock_result
+    mock_connect.return_value.__enter__.return_value = mock_connection
+
+    execute_query("SELECT id FROM orders")
+
+    executed_argument = mock_connection.execute.call_args.args[0]
+
+    assert str(executed_argument) == "SELECT id FROM orders LIMIT 1000"
+
+
+@patch("app.database.query.engine.connect")
+@patch("app.database.query.discover_schema")
+def test_execute_query_preserves_existing_row_limit(
+    mock_discover_schema,
+    mock_connect,
+):
+    mock_discover_schema.return_value.tables = {
+        "orders": Mock(columns=[FakeColumn("id")])
+    }
+
+    mock_connection = Mock()
+    mock_result = Mock()
+    mock_result.keys.return_value = ["id"]
+    mock_result.mappings.return_value.all.return_value = [{"id": 1}]
+
+    mock_connection.execute.return_value = mock_result
+    mock_connect.return_value.__enter__.return_value = mock_connection
+
+    execute_query("SELECT id FROM orders LIMIT 10")
+
+    executed_argument = mock_connection.execute.call_args.args[0]
+
+    assert str(executed_argument) == "SELECT id FROM orders LIMIT 10"

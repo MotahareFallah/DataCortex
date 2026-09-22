@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.config import settings
 from app.database.connection import engine
 from app.database.schema import discover_schema
 from app.database.security import DatabaseSecurityPolicy
@@ -22,6 +23,13 @@ def execute_query(sql: str) -> QueryResult:
 
     validate_sql(sql, schema)
 
+    security_policy = DatabaseSecurityPolicy()
+
+    sql = security_policy.apply_row_limit(
+        sql,
+        settings.database_type,
+    )
+
     try:
         with engine.connect() as connection:
             result = connection.execute(text(sql))
@@ -29,7 +37,6 @@ def execute_query(sql: str) -> QueryResult:
             columns = list(result.keys())
             rows = [dict(row) for row in result.mappings().all()]
 
-            security_policy = DatabaseSecurityPolicy()
             security_policy.validate_row_limit(len(rows))
 
     except SQLAlchemyError as exc:

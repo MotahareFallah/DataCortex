@@ -18,6 +18,26 @@ class DatabaseSecurityPolicy:
             return bool(re.search(r"\blimit\s+\d+", normalized_sql))
 
         if database_type == "sqlserver":
-            return bool(re.match(r"^select\s+(distinct\s+)?top\s+\d+", normalized_sql))
+            return bool(
+                re.match(
+                    r"^select\s+(distinct\s+)?top\s+\d+",
+                    normalized_sql,
+                )
+            )
 
         return False
+
+    def apply_row_limit(self, sql: str, database_type: str) -> str:
+        if self.has_row_limit(sql, database_type):
+            return sql
+
+        normalized_sql = sql.strip()
+
+        if database_type in {"postgresql", "mysql"}:
+            return f"{normalized_sql.rstrip(';')} LIMIT {self.MAX_ROWS}"
+
+        if database_type == "sqlserver":
+            if normalized_sql.lower().startswith("select "):
+                return f"SELECT TOP {self.MAX_ROWS} {normalized_sql[7:]}"
+
+        return sql

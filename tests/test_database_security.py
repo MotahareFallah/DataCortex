@@ -47,3 +47,36 @@ def test_has_row_limit_detects_sqlserver_top():
         "SELECT TOP 10 * FROM products",
         "sqlserver",
     )
+
+
+def test_apply_row_limit_adds_postgresql_limit():
+    policy = DatabaseSecurityPolicy()
+
+    result = policy.apply_row_limit(
+        "SELECT * FROM products",
+        "postgresql",
+    )
+
+    assert result == "SELECT * FROM products LIMIT 1000"
+
+
+def test_apply_row_limit_preserves_existing_limit():
+    policy = DatabaseSecurityPolicy()
+
+    result = policy.apply_row_limit(
+        "SELECT * FROM products LIMIT 10",
+        "postgresql",
+    )
+
+    assert result == "SELECT * FROM products LIMIT 10"
+
+
+def test_apply_row_limit_adds_sqlserver_top():
+    policy = DatabaseSecurityPolicy()
+
+    result = policy.apply_row_limit(
+        "SELECT * FROM products",
+        "sqlserver",
+    )
+
+    assert result == "SELECT TOP 1000 * FROM products"
