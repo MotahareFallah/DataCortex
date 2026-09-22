@@ -26,3 +26,36 @@ def test_sql_prompt_requires_valid_table_column_relationship():
         in prompt
     )
     assert "orders(id, total_amount)" in prompt
+
+
+def test_build_sql_prompt_for_postgresql():
+    prompt = build_sql_prompt(
+        question="Show total sales",
+        schema="orders(id, total)",
+        database_type="postgresql",
+    )
+
+    assert "postgresql" in prompt
+    assert "%s" in prompt
+
+
+def test_build_sql_prompt_for_mysql():
+    prompt = build_sql_prompt(
+        question="Show total sales",
+        schema="orders(id, total)",
+        database_type="mysql",
+    )
+
+    assert "mysql" in prompt.lower()
+    assert "%s" in prompt
+
+
+def test_build_sql_prompt_for_sqlserver():
+    prompt = build_sql_prompt(
+        question="Show total sales",
+        schema="orders(id, total)",
+        database_type="sqlserver",
+    )
+
+    assert "sqlserver" in prompt.lower()
+    assert "?" in prompt

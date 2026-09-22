@@ -1,9 +1,18 @@
-def build_sql_prompt(question: str, schema: str) -> str:
+from app.database.database import get_database_adapter
+
+
+def build_sql_prompt(
+    question: str,
+    schema: str,
+    database_type: str = "postgresql",
+) -> str:
+    adapter = get_database_adapter(database_type)
+
     return f"""
 You are a SQL generation assistant.
 
 Convert the user's natural language question into
-a PostgreSQL SELECT query.
+a SQL SELECT query for {database_type}.
 
 Rules:
 - Generate only SELECT statements.
@@ -12,9 +21,9 @@ Rules:
 - Do not invent tables or columns.
 - Use the minimum number of tables required to answer the question.
 - Do not add JOINs unless they are necessary to answer the question.
-- If the requested column exists directly in a table that can answer the question,
-  use that table directly.
 - Carefully verify that every column belongs to the table or alias used.
+- Use the database-specific SQL syntax for {database_type}.
+- Use {adapter.placeholder()} as the parameter placeholder when parameters are required.
 - Return only the SQL query.
 - Do not use markdown.
 - Do not explain the query.
