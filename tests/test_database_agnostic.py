@@ -144,3 +144,15 @@ def test_database_adapter_apply_limit_sqlserver():
     )
 
     assert result == "SELECT TOP 1000 id FROM orders"
+
+
+def test_postgresql_adapter_has_limit():
+    adapter = get_database_adapter("postgresql")
+
+    assert adapter.has_limit("SELECT * FROM products LIMIT 10")
+
+
+def test_sqlserver_adapter_has_limit():
+    adapter = get_database_adapter("sqlserver")
+
+    assert adapter.has_limit("SELECT TOP 10 * FROM products")

@@ -1,4 +1,4 @@
-import re
+from app.database.database import DatabaseAdapter
 
 
 class DatabaseSecurityPolicy:
@@ -11,33 +11,15 @@ class DatabaseSecurityPolicy:
                 f"Maximum allowed is {self.MAX_ROWS}."
             )
 
-    def has_row_limit(self, sql: str, database_type: str) -> bool:
-        normalized_sql = sql.strip().lower()
+    def has_row_limit(self, sql: str, adapter: DatabaseAdapter) -> bool:
+        return adapter.has_limit(sql)
 
-        if database_type in {"postgresql", "mysql"}:
-            return bool(re.search(r"\blimit\s+\d+", normalized_sql))
-
-        if database_type == "sqlserver":
-            return bool(
-                re.match(
-                    r"^select\s+(distinct\s+)?top\s+\d+",
-                    normalized_sql,
-                )
-            )
-
-        return False
-
-    def apply_row_limit(self, sql: str, database_type: str) -> str:
-        if self.has_row_limit(sql, database_type):
+    def apply_row_limit(
+        self,
+        sql: str,
+        adapter: DatabaseAdapter,
+    ) -> str:
+        if self.has_row_limit(sql, adapter):
             return sql
 
-        normalized_sql = sql.strip()
-
-        if database_type in {"postgresql", "mysql"}:
-            return f"{normalized_sql.rstrip(';')} LIMIT {self.MAX_ROWS}"
-
-        if database_type == "sqlserver":
-            if normalized_sql.lower().startswith("select "):
-                return f"SELECT TOP {self.MAX_ROWS} {normalized_sql[7:]}"
-
-        return sql
+        return adapter.apply_limit(sql, self.MAX_ROWS)

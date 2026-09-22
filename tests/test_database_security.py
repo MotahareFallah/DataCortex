@@ -1,5 +1,6 @@
 import pytest
 
+from app.database.database import get_database_adapter
 from app.database.security import DatabaseSecurityPolicy
 
 
@@ -24,37 +25,41 @@ def test_validate_row_limit_rejects_too_many_rows():
 
 def test_has_row_limit_detects_postgresql_limit():
     policy = DatabaseSecurityPolicy()
+    adapter = get_database_adapter("postgresql")
 
     assert policy.has_row_limit(
         "SELECT * FROM products LIMIT 10",
-        "postgresql",
+        adapter,
     )
 
 
 def test_has_row_limit_detects_mysql_limit():
     policy = DatabaseSecurityPolicy()
+    adapter = get_database_adapter("mysql")
 
     assert policy.has_row_limit(
         "SELECT * FROM products LIMIT 10",
-        "mysql",
+        adapter,
     )
 
 
 def test_has_row_limit_detects_sqlserver_top():
     policy = DatabaseSecurityPolicy()
+    adapter = get_database_adapter("sqlserver")
 
     assert policy.has_row_limit(
         "SELECT TOP 10 * FROM products",
-        "sqlserver",
+        adapter,
     )
 
 
 def test_apply_row_limit_adds_postgresql_limit():
     policy = DatabaseSecurityPolicy()
+    adapter = get_database_adapter("postgresql")
 
     result = policy.apply_row_limit(
         "SELECT * FROM products",
-        "postgresql",
+        adapter,
     )
 
     assert result == "SELECT * FROM products LIMIT 1000"
@@ -62,10 +67,11 @@ def test_apply_row_limit_adds_postgresql_limit():
 
 def test_apply_row_limit_preserves_existing_limit():
     policy = DatabaseSecurityPolicy()
+    adapter = get_database_adapter("postgresql")
 
     result = policy.apply_row_limit(
         "SELECT * FROM products LIMIT 10",
-        "postgresql",
+        adapter,
     )
 
     assert result == "SELECT * FROM products LIMIT 10"
@@ -73,10 +79,11 @@ def test_apply_row_limit_preserves_existing_limit():
 
 def test_apply_row_limit_adds_sqlserver_top():
     policy = DatabaseSecurityPolicy()
+    adapter = get_database_adapter("sqlserver")
 
     result = policy.apply_row_limit(
         "SELECT * FROM products",
-        "sqlserver",
+        adapter,
     )
 
     assert result == "SELECT TOP 1000 * FROM products"

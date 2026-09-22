@@ -13,6 +13,9 @@ class DatabaseAdapter:
     def placeholder(self) -> str:
         return self.dialect.placeholder()
 
+    def has_limit(self, sql: str) -> bool:
+        return self.dialect.has_limit(sql)
+
     def apply_limit(self, sql: str, limit: int) -> str:
         return self.dialect.apply_limit(sql, limit)
 

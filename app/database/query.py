@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.database.connection import engine
+from app.database.database import get_database_adapter
 from app.database.schema import discover_schema
 from app.database.security import DatabaseSecurityPolicy
 from app.database.sql_validator import validate_sql
@@ -23,11 +24,12 @@ def execute_query(sql: str) -> QueryResult:
 
     validate_sql(sql, schema)
 
+    database_adapter = get_database_adapter(settings.database_type)
     security_policy = DatabaseSecurityPolicy()
 
     sql = security_policy.apply_row_limit(
         sql,
-        settings.database_type,
+        database_adapter,
     )
 
     try:
