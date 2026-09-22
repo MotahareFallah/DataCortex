@@ -1,3 +1,5 @@
+from app.services.embedding import EmbeddingService
+
 KNOWLEDGE_BASE = [
     {
         "id": "sales_definition",
@@ -26,6 +28,15 @@ KNOWLEDGE_BASE = [
 ]
 
 
+_embedding_service = EmbeddingService()
+
+
+for document in KNOWLEDGE_BASE:
+    document["embedding"] = _embedding_service.embed(
+        f"{document['title']}. {document['content']}"
+    )
+
+
 def search_knowledge(query: str) -> list[dict]:
     query_words = set(query.lower().split())
 
@@ -40,3 +51,38 @@ def search_knowledge(query: str) -> list[dict]:
             results.append(document)
 
     return results
+
+
+def semantic_search(
+    query: str,
+    top_k: int = 3,
+) -> list[dict]:
+    query_embedding = _embedding_service.embed(query)
+
+    results = []
+
+    for document in KNOWLEDGE_BASE:
+        score = sum(
+            query_value * document_value
+            for query_value, document_value in zip(
+                query_embedding,
+                document["embedding"],
+                strict=False,
+            )
+        )
+
+        results.append(
+            {
+                "id": document["id"],
+                "title": document["title"],
+                "content": document["content"],
+                "score": score,
+            }
+        )
+
+    results.sort(
+        key=lambda document: document["score"],
+        reverse=True,
+    )
+
+    return results[:top_k]
