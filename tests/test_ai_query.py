@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from app.database.query import SQLExecutionError
+from app.database.sql_validator import UnsafeSQLQueryError
 from app.schemas.database import (
     ColumnSchema,
     DatabaseSchema,
@@ -218,3 +219,81 @@ def test_ai_query_service_passes_query_result_to_answer_service():
             columns=["total_sales"],
             rows=[{"total_sales": "1022033.54"}],
         )
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_repairs_invalid_sql_and_executes_repaired_query(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
+    )
+
+    # The first query uses a column that does not exist, so validation fails.
+    mock_agent.return_value.run.return_value = "SELECT missing_column FROM orders"
+    mock_agent.return_value.repair_sql.return_value = "SELECT total_amount FROM orders"
+
+    mock_execute_query.return_value = QueryResult(
+        columns=["total_amount"],
+        rows=[{"total_amount": 100}],
+        row_count=1,
+    )
+
+    service = AIQueryService()
+
+    result = service.query("Show order totals")
+
+    mock_agent.return_value.repair_sql.assert_called_once()
+    mock_execute_query.assert_called_once_with("SELECT total_amount FROM orders")
+    assert result.sql == "SELECT total_amount FROM orders"
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_raises_unsafe_error_when_repair_also_fails(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
+    )
+
+    mock_agent.return_value.run.return_value = "SELECT missing_column FROM orders"
+    mock_agent.return_value.repair_sql.return_value = "SELECT other_missing FROM orders"
+
+    service = AIQueryService()
+
+    with pytest.raises(UnsafeSQLQueryError):
+        service.query("How are we doing?")
+
+    # Invalid SQL must never reach the database.
+    mock_execute_query.assert_not_called()
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_attempts_repair_only_once(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
+    )
+
+    mock_agent.return_value.run.return_value = "SELECT missing_column FROM orders"
+    mock_agent.return_value.repair_sql.return_value = "SELECT other_missing FROM orders"
+
+    service = AIQueryService()
+
+    with pytest.raises(UnsafeSQLQueryError):
+        service.query("How are we doing?")
+
+    mock_agent.return_value.repair_sql.assert_called_once()

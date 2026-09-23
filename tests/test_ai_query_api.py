@@ -3,6 +3,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.database.query import SQLExecutionError
+from app.database.sql_validator import UnsafeSQLQueryError
 from app.main import app
 from app.schemas.ai_query import AIQueryResponse
 
@@ -137,3 +138,22 @@ def test_ai_query_endpoint_includes_answer_in_response():
 
         assert "answer" in data
         assert isinstance(data["answer"], str)
+
+
+@patch("app.api.routes.ai_query.AIQueryService")
+def test_ai_query_endpoint_returns_422_when_sql_cannot_be_validated(
+    mock_service,
+):
+    mock_service.return_value.query.side_effect = UnsafeSQLQueryError(
+        "Invalid SQL query."
+    )
+
+    response = client.post(
+        "/ai/query",
+        json={"question": "How are we doing?"},
+    )
+
+    assert response.status_code == 422
+    assert "couldn't turn" in response.json()["detail"]
+    # Technical details must not leak to the user.
+    assert "Invalid SQL query" not in response.json()["detail"]
