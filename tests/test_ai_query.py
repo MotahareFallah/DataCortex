@@ -19,7 +19,7 @@ def test_ai_query_builds_and_executes_sql(
         '{"tables": {"orders": {"columns": ["total_amount"]}}}'
     )
 
-    mock_text_to_sql.return_value.generate_sql.return_value = (
+    mock_text_to_sql.return_value.generate_sql_with_tool.return_value = (
         "SELECT SUM(total_amount) AS total_sales FROM orders"
     )
 
@@ -33,14 +33,14 @@ def test_ai_query_builds_and_executes_sql(
 
     result = service.query("What are the total sales?")
 
-    mock_text_to_sql.return_value.generate_sql.assert_called_once()
+    mock_text_to_sql.return_value.generate_sql_with_tool.assert_called_once()
 
     mock_execute_query.assert_called_once_with(
         "SELECT SUM(total_amount) AS total_sales FROM orders"
     )
 
     assert result.question == "What are the total sales?"
-    assert result.sql == ("SELECT SUM(total_amount) AS total_sales FROM orders")
+    assert result.sql == "SELECT SUM(total_amount) AS total_sales FROM orders"
     assert result.columns == ["total_sales"]
     assert result.rows == [{"total_sales": 12345}]
     assert result.row_count == 1
@@ -58,7 +58,7 @@ def test_ai_query_passes_schema_to_text_to_sql(
 
     mock_discover_schema.return_value.model_dump_json.return_value = schema
 
-    mock_text_to_sql.return_value.generate_sql.return_value = (
+    mock_text_to_sql.return_value.generate_sql_with_tool.return_value = (
         "SELECT COUNT(*) FROM customers"
     )
 
@@ -72,7 +72,7 @@ def test_ai_query_passes_schema_to_text_to_sql(
 
     service.query("How many customers are there?")
 
-    mock_text_to_sql.return_value.generate_sql.assert_called_once_with(
+    mock_text_to_sql.return_value.generate_sql_with_tool.assert_called_once_with(
         question="How many customers are there?",
         schema=schema,
     )
@@ -90,7 +90,7 @@ def test_ai_query_raises_error_when_generated_sql_fails(
         '{"orders": {"columns": ["total_amount"]}}'
     )
 
-    mock_text_to_sql.return_value.generate_sql.return_value = (
+    mock_text_to_sql.return_value.generate_sql_with_tool.return_value = (
         "SELECT invalid_column FROM orders"
     )
 
@@ -117,7 +117,7 @@ def test_ai_query_preserves_original_execution_error(
         '{"orders": {"columns": ["total_amount"]}}'
     )
 
-    mock_text_to_sql.return_value.generate_sql.return_value = (
+    mock_text_to_sql.return_value.generate_sql_with_tool.return_value = (
         "SELECT invalid_column FROM orders"
     )
 
@@ -141,7 +141,7 @@ def test_ai_query_service_generates_answer():
     ):
         mock_schema.return_value.model_dump_json.return_value = "{}"
 
-        mock_text_to_sql.return_value.generate_sql.return_value = (
+        mock_text_to_sql.return_value.generate_sql_with_tool.return_value = (
             "SELECT SUM(total_amount) AS total_sales FROM orders"
         )
 
@@ -169,7 +169,7 @@ def test_ai_query_service_passes_query_result_to_answer_service():
     ):
         mock_schema.return_value.model_dump_json.return_value = "{}"
 
-        mock_text_to_sql.return_value.generate_sql.return_value = (
+        mock_text_to_sql.return_value.generate_sql_with_tool.return_value = (
             "SELECT SUM(total_amount) AS total_sales FROM orders"
         )
 

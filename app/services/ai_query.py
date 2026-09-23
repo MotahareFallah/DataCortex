@@ -14,7 +14,7 @@ class AIQueryService:
     def query(self, question: str) -> AIQueryResponse:
         schema = discover_schema().model_dump_json(indent=2)
 
-        sql = self.text_to_sql.generate_sql(
+        sql = self.text_to_sql.generate_sql_with_tool(
             question=question,
             schema=schema,
         )
