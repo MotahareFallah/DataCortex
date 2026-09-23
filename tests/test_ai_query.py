@@ -11,6 +11,10 @@ from app.schemas.database import (
 )
 from app.schemas.query import QueryResult
 from app.services.ai_query import AIQueryService
+from app.services.exceptions import (
+    QuestionNotAnswerableError,
+    WriteRequestError,
+)
 
 
 def make_schema(*tables: tuple[str, list[str]]) -> DatabaseSchema:
@@ -297,3 +301,84 @@ def test_ai_query_attempts_repair_only_once(
         service.query("How are we doing?")
 
     mock_agent.return_value.repair_sql.assert_called_once()
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_raises_when_model_says_cannot_answer(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(("customers", ["id", "name"]))
+    mock_agent.return_value.run.return_value = "CANNOT_ANSWER"
+
+    service = AIQueryService()
+
+    with pytest.raises(QuestionNotAnswerableError):
+        service.query("Show me the customer birthdays")
+
+    mock_agent.return_value.repair_sql.assert_not_called()
+    mock_execute_query.assert_not_called()
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_raises_when_repair_says_cannot_answer(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(("orders", ["total_amount"]))
+    mock_agent.return_value.run.return_value = "SELECT missing_column FROM orders"
+    mock_agent.return_value.repair_sql.return_value = "CANNOT_ANSWER"
+
+    service = AIQueryService()
+
+    with pytest.raises(QuestionNotAnswerableError):
+        service.query("How are we doing?")
+
+    mock_execute_query.assert_not_called()
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_rejects_write_requests_before_calling_llm(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    service = AIQueryService()
+
+    with pytest.raises(WriteRequestError):
+        service.query("Delete all orders")
+
+    mock_agent.return_value.run.assert_not_called()
+    mock_execute_query.assert_not_called()
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_truncates_large_results(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(("orders", ["id"]))
+    mock_agent.return_value.run.return_value = "SELECT id FROM orders"
+    mock_execute_query.return_value = QueryResult(
+        columns=["id"],
+        rows=[{"id": i} for i in range(150)],
+        row_count=150,
+    )
+
+    service = AIQueryService()
+    result = service.query("List all order ids")
+
+    assert len(result.rows) == 100
+    assert result.row_count == 150
+    assert result.truncated is True

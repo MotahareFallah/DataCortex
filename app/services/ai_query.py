@@ -6,9 +6,16 @@ from app.database.sql_validator import UnsafeSQLQueryError, validate_sql
 from app.schemas.ai_query import AIQueryResponse
 from app.services.agent import AIAgent
 from app.services.answer import AnswerService
-from app.services.sql_cleaner import clean_sql
+from app.services.exceptions import (
+    QuestionNotAnswerableError,
+    WriteRequestError,
+)
+from app.services.question_guard import is_write_request
+from app.services.sql_cleaner import clean_sql, is_cannot_answer
 from app.services.sql_prompt import build_sql_prompt
 from app.services.sql_repair_prompt import build_sql_repair_prompt
+
+MAX_RESPONSE_ROWS = 100
 
 
 class AIQueryService:
@@ -46,6 +53,11 @@ class AIQueryService:
 
             logging.warning("Repaired SQL: %s", repaired_sql)
 
+            if is_cannot_answer(repaired_sql):
+                raise QuestionNotAnswerableError(
+                    "The model reported that the data is not available."
+                ) from exc
+
             # Repair is attempted only once. If the repaired SQL is still
             # invalid, this raises UnsafeSQLQueryError and the API route
             # converts it into a 422 response.
@@ -54,6 +66,11 @@ class AIQueryService:
             return repaired_sql
 
     def query(self, question: str) -> AIQueryResponse:
+        # Cheap deterministic guard: never send write requests to the LLM.
+        # This is a UX layer; the SQL validator remains the security boundary.
+        if is_write_request(question):
+            raise WriteRequestError("Write operations are not supported.")
+
         schema = discover_schema().model_dump_json(indent=2)
 
         prompt = build_sql_prompt(
@@ -65,6 +82,11 @@ class AIQueryService:
         sql = clean_sql(sql)
 
         logging.warning("Initial generated SQL: %s", sql)
+
+        if is_cannot_answer(sql):
+            raise QuestionNotAnswerableError(
+                "The model reported that the data is not available."
+            )
 
         sql = self._validate_and_repair_sql(
             sql=sql,
@@ -78,17 +100,21 @@ class AIQueryService:
                 "AI-generated SQL query failed to execute."
             ) from exc
 
+        truncated = len(result.rows) > MAX_RESPONSE_ROWS
+        rows = result.rows[:MAX_RESPONSE_ROWS]
+
         answer = self.answer.generate_answer(
             question=question,
             columns=result.columns,
-            rows=result.rows,
+            rows=rows,
         )
 
         return AIQueryResponse(
             question=question,
             sql=sql,
             columns=result.columns,
-            rows=result.rows,
+            rows=rows,
             row_count=result.row_count,
             answer=answer,
+            truncated=truncated,
         )
