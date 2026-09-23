@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     ollama_base_url: str
     ollama_model: str
+    ollama_temperature: float = 0.0
+    ollama_num_ctx: int = 8192
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch
 
+from app.core.config import settings
 from app.services.llm import LLMService
 
 
@@ -33,11 +34,15 @@ def test_llm_generate_sends_correct_payload(mock_post):
     service.generate("Test prompt")
 
     mock_post.assert_called_once_with(
-        "http://localhost:11434/api/generate",
+        f"{settings.ollama_base_url}/api/generate",
         json={
-            "model": "qwen2.5-coder:1.5b",
+            "model": settings.ollama_model,
             "prompt": "Test prompt",
             "stream": False,
+            "options": {
+                "temperature": settings.ollama_temperature,
+                "num_ctx": settings.ollama_num_ctx,
+            },
         },
         timeout=120,
     )

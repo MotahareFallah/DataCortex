@@ -31,13 +31,17 @@ jobs:
     env:
       APP_NAME: DataCortex
       APP_VERSION: 0.1.0
+
       POSTGRES_DB: test_db
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
+
       OLLAMA_BASE_URL: http://localhost:11434
       OLLAMA_MODEL: qwen2.5-coder:1.5b
+      OLLAMA_TEMPERATURE: 0.0
+      OLLAMA_NUM_CTX: 8192
 
     steps:
       - name: Checkout repository
@@ -61,7 +65,9 @@ jobs:
         run: ruff format --check .
 
       - name: Create database schema
-        run: psql "postgresql://test_user:test_password@localhost:5432/test_db" -f app/database/sql/schema.sql
+        run: |
+          psql "postgresql://test_user:test_password@localhost:5432/test_db" \
+            -f app/database/sql/schema.sql
 
       - name: Seed database
         run: python -m app.database.seed
