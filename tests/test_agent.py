@@ -5,103 +5,70 @@ import pytest
 from app.services.agent import AIAgent
 
 
-def test_agent_extracts_standard_tool_call():
+def test_agent_returns_generated_sql():
     agent = AIAgent()
-
-    response = {
-        "message": {
-            "tool_calls": [
-                {
-                    "function": {
-                        "name": "execute_sql",
-                        "arguments": {
-                            "sql": "SELECT * FROM orders",
-                        },
-                    }
-                }
-            ]
-        }
-    }
 
     with patch.object(
         agent.llm,
-        "generate_with_tools",
-        return_value=response,
+        "generate",
+        return_value="SELECT * FROM orders",
     ):
         result = agent.run("Show me orders.")
 
     assert result == "SELECT * FROM orders"
 
 
-def test_agent_extracts_json_content_tool_call():
+def test_agent_strips_generated_sql():
     agent = AIAgent()
-
-    response = {
-        "message": {
-            "content": """```json
-{
-  "name": "execute_sql",
-  "arguments": {
-    "sql": "SELECT * FROM orders"
-  }
-}
-```"""
-        }
-    }
 
     with patch.object(
         agent.llm,
-        "generate_with_tools",
-        return_value=response,
+        "generate",
+        return_value="  SELECT * FROM orders  ",
     ):
         result = agent.run("Show me orders.")
 
     assert result == "SELECT * FROM orders"
 
 
-def test_agent_raises_when_no_tool_call_is_returned():
+def test_agent_raises_when_llm_returns_empty_sql():
     agent = AIAgent()
-
-    response = {
-        "message": {
-            "content": "",
-            "tool_calls": [],
-        }
-    }
 
     with patch.object(
         agent.llm,
-        "generate_with_tools",
-        return_value=response,
+        "generate",
+        return_value="",
     ):
         with pytest.raises(
             ValueError,
-            match="LLM did not return a tool call.",
+            match="LLM returned an empty SQL query.",
         ):
             agent.run("Show me orders.")
 
 
-def test_agent_raises_for_invalid_tool():
+def test_agent_repairs_sql():
     agent = AIAgent()
-
-    response = {
-        "message": {
-            "content": """{
-                "name": "unknown_tool",
-                "arguments": {
-                    "sql": "SELECT * FROM orders"
-                }
-            }"""
-        }
-    }
 
     with patch.object(
         agent.llm,
-        "generate_with_tools",
-        return_value=response,
+        "generate",
+        return_value="SELECT * FROM orders",
+    ):
+        result = agent.repair_sql("Repair this SQL.")
+
+    assert result == "SELECT * FROM orders"
+
+
+def test_agent_raises_when_repair_returns_empty_sql():
+    agent = AIAgent()
+
+    with patch.object(
+        agent.llm,
+        "generate",
+        return_value="",
     ):
         with pytest.raises(
             ValueError,
-            match="LLM did not return the execute_sql tool.",
+            match="LLM returned an empty SQL query.",
         ):
-            agent.run("Show me orders.")
+            agent.repair_sql("Repair this SQL.")

@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
@@ -45,3 +47,6 @@ uvicorn==0.53.0
 virtualenv==21.9.0
 requests==2.34.2
 sqlglot==30.18.0
+
+sentence-transformers==6.1.0
+torch==2.14.0+cpu

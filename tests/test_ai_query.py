@@ -3,8 +3,35 @@ from unittest.mock import patch
 import pytest
 
 from app.database.query import SQLExecutionError
+from app.schemas.database import (
+    ColumnSchema,
+    DatabaseSchema,
+    TableSchema,
+)
 from app.schemas.query import QueryResult
 from app.services.ai_query import AIQueryService
+
+
+def make_schema(*tables: tuple[str, list[str]]) -> DatabaseSchema:
+    return DatabaseSchema(
+        database="test_db",
+        tables={
+            table_name: TableSchema(
+                columns=[
+                    ColumnSchema(
+                        name=column_name,
+                        type="INTEGER",
+                        nullable=True,
+                        default=None,
+                    )
+                    for column_name in columns
+                ],
+                primary_key=[],
+                foreign_keys=[],
+            )
+            for table_name, columns in tables
+        },
+    )
 
 
 @patch("app.services.ai_query.execute_query")
@@ -15,8 +42,8 @@ def test_ai_query_builds_and_executes_sql(
     mock_agent,
     mock_execute_query,
 ):
-    mock_discover_schema.return_value.model_dump_json.return_value = (
-        '{"tables": {"orders": {"columns": ["total_amount"]}}}'
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
     )
 
     mock_agent.return_value.run.return_value = (
@@ -54,9 +81,9 @@ def test_ai_query_passes_schema_to_agent(
     mock_agent,
     mock_execute_query,
 ):
-    schema = '{"tables": {"customers": {"columns": ["id", "name"]}}}'
-
-    mock_discover_schema.return_value.model_dump_json.return_value = schema
+    mock_discover_schema.return_value = make_schema(
+        ("customers", ["id", "name"]),
+    )
 
     mock_agent.return_value.run.return_value = "SELECT COUNT(*) FROM customers"
 
@@ -71,6 +98,9 @@ def test_ai_query_passes_schema_to_agent(
     service.query("How many customers are there?")
 
     prompt = mock_agent.return_value.run.call_args.args[0]
+    schema = mock_discover_schema.return_value.model_dump_json(
+        indent=2,
+    )
 
     assert schema in prompt
     assert "How many customers are there?" in prompt
@@ -84,11 +114,11 @@ def test_ai_query_raises_error_when_generated_sql_fails(
     mock_agent,
     mock_execute_query,
 ):
-    mock_discover_schema.return_value.model_dump_json.return_value = (
-        '{"orders": {"columns": ["total_amount"]}}'
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
     )
 
-    mock_agent.return_value.run.return_value = "SELECT invalid_column FROM orders"
+    mock_agent.return_value.run.return_value = "SELECT total_amount FROM orders"
 
     mock_execute_query.side_effect = SQLExecutionError("Failed to execute SQL query.")
 
@@ -109,11 +139,11 @@ def test_ai_query_preserves_original_execution_error(
     mock_agent,
     mock_execute_query,
 ):
-    mock_discover_schema.return_value.model_dump_json.return_value = (
-        '{"orders": {"columns": ["total_amount"]}}'
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
     )
 
-    mock_agent.return_value.run.return_value = "SELECT invalid_column FROM orders"
+    mock_agent.return_value.run.return_value = "SELECT total_amount FROM orders"
 
     original_error = SQLExecutionError("Failed to execute SQL query.")
     mock_execute_query.side_effect = original_error
@@ -133,7 +163,9 @@ def test_ai_query_service_generates_answer():
         patch("app.services.ai_query.AnswerService") as mock_answer_service,
         patch("app.services.ai_query.execute_query") as mock_execute,
     ):
-        mock_schema.return_value.model_dump_json.return_value = "{}"
+        mock_schema.return_value = make_schema(
+            ("orders", ["total_amount"]),
+        )
 
         mock_agent.return_value.run.return_value = (
             "SELECT SUM(total_amount) AS total_sales FROM orders"
@@ -161,7 +193,9 @@ def test_ai_query_service_passes_query_result_to_answer_service():
         patch("app.services.ai_query.AnswerService") as mock_answer_service,
         patch("app.services.ai_query.execute_query") as mock_execute,
     ):
-        mock_schema.return_value.model_dump_json.return_value = "{}"
+        mock_schema.return_value = make_schema(
+            ("orders", ["total_amount"]),
+        )
 
         mock_agent.return_value.run.return_value = (
             "SELECT SUM(total_amount) AS total_sales FROM orders"
