@@ -13,6 +13,17 @@ jobs:
   quality:
     runs-on: ubuntu-latest
 
+    env:
+      APP_NAME: DataCortex
+      APP_VERSION: 0.1.0
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      OLLAMA_BASE_URL: http://localhost:11434
+      OLLAMA_MODEL: qwen2.5-coder:1.5b
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
