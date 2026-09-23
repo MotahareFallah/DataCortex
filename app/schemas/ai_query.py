@@ -14,3 +14,4 @@ class AIQueryResponse(BaseModel):
     rows: list[dict[str, Any]]
     row_count: int
     answer: str
+    truncated: bool = False

@@ -6,6 +6,10 @@ from app.database.query import SQLExecutionError
 from app.database.sql_validator import UnsafeSQLQueryError
 from app.main import app
 from app.schemas.ai_query import AIQueryResponse
+from app.services.exceptions import (
+    QuestionNotAnswerableError,
+    WriteRequestError,
+)
 
 client = TestClient(app)
 
@@ -157,3 +161,29 @@ def test_ai_query_endpoint_returns_422_when_sql_cannot_be_validated(
     assert "couldn't turn" in response.json()["detail"]
     # Technical details must not leak to the user.
     assert "Invalid SQL query" not in response.json()["detail"]
+
+
+@patch("app.api.routes.ai_query.AIQueryService")
+def test_ai_query_endpoint_returns_422_when_question_not_answerable(mock_service):
+    mock_service.return_value.query.side_effect = QuestionNotAnswerableError("x")
+
+    response = client.post(
+        "/ai/query",
+        json={"question": "Show customer birthdays"},
+    )
+
+    assert response.status_code == 422
+    assert "can't answer" in response.json()["detail"]
+
+
+@patch("app.api.routes.ai_query.AIQueryService")
+def test_ai_query_endpoint_returns_422_for_write_requests(mock_service):
+    mock_service.return_value.query.side_effect = WriteRequestError("x")
+
+    response = client.post(
+        "/ai/query",
+        json={"question": "Delete all orders"},
+    )
+
+    assert response.status_code == 422
+    assert "read-only" in response.json()["detail"]
