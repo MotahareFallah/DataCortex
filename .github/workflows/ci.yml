@@ -60,5 +60,11 @@ jobs:
       - name: Check Ruff formatting
         run: ruff format --check .
 
+      - name: Create database schema
+        run: psql "postgresql://test_user:test_password@localhost:5432/test_db" -f app/database/sql/schema.sql
+
+      - name: Seed database
+        run: python -m app.database.seed
+
       - name: Run tests
         run: pytest
