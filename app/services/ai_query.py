@@ -1,3 +1,5 @@
+import logging
+
 from app.database.query import SQLExecutionError, execute_query
 from app.database.schema import discover_schema
 from app.database.sql_validator import UnsafeSQLQueryError, validate_sql
@@ -31,6 +33,8 @@ class AIQueryService:
             return sql
 
         except UnsafeSQLQueryError as exc:
+            logging.warning("Initial SQL rejected (%s): %s", exc, sql)
+
             repair_prompt = build_sql_repair_prompt(
                 sql=sql,
                 error=str(exc),
@@ -40,6 +44,11 @@ class AIQueryService:
             repaired_sql = self.agent.repair_sql(repair_prompt)
             repaired_sql = clean_sql(repaired_sql)
 
+            logging.warning("Repaired SQL: %s", repaired_sql)
+
+            # Repair is attempted only once. If the repaired SQL is still
+            # invalid, this raises UnsafeSQLQueryError and the API route
+            # converts it into a 422 response.
             validate_sql(repaired_sql, validation_schema)
 
             return repaired_sql
@@ -54,6 +63,8 @@ class AIQueryService:
 
         sql = self.agent.run(prompt)
         sql = clean_sql(sql)
+
+        logging.warning("Initial generated SQL: %s", sql)
 
         sql = self._validate_and_repair_sql(
             sql=sql,
