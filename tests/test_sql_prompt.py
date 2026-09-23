@@ -59,3 +59,14 @@ def test_build_sql_prompt_for_sqlserver():
 
     assert "sqlserver" in prompt.lower()
     assert "?" in prompt
+
+
+def test_sql_prompt_includes_business_semantics():
+    prompt = build_sql_prompt(
+        question="What are the total sales?",
+        schema="orders(id, total_amount)",
+    )
+
+    assert "Business semantics:" in prompt
+    assert "total_sales" in prompt
+    assert "sum of order_items.line_total" in prompt
