@@ -17,6 +17,8 @@ Rules:
 - Do not invent tables or columns.
 - Preserve the original intent of the user's query.
 - Fix only the SQL problems necessary to make the query valid.
+- If the query cannot be fixed because the required data does not exist
+  in the schema, return exactly: CANNOT_ANSWER
 - Use valid {database_type} syntax.
 - Do not use markdown.
 - Do not explain the changes.
