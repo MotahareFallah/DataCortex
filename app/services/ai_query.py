@@ -2,6 +2,11 @@ import logging
 
 from app.database.query import SQLExecutionError, execute_query
 from app.database.schema import discover_schema
+from app.database.sql_repair import repair_column_table_reference
+from app.database.sql_semantic_validator import (
+    SemanticSQLValidationError,
+    validate_sql_semantics,
+)
 from app.database.sql_validator import UnsafeSQLQueryError, validate_sql
 from app.schemas.ai_query import AIQueryResponse
 from app.services.agent import AIAgent
@@ -23,51 +28,126 @@ class AIQueryService:
         self.agent = AIAgent()
         self.answer = AnswerService()
 
-    def _validate_and_repair_sql(
-        self,
-        sql: str,
-        schema: str,
-    ) -> str:
+    def _build_validation_schema(self) -> dict[str, set[str]]:
         database_schema = discover_schema()
 
-        validation_schema = {
+        return {
             table_name: {column.name for column in table_schema.columns}
             for table_name, table_schema in database_schema.tables.items()
         }
 
+    def _validate_sql(
+        self,
+        sql: str,
+        question: str,
+        validation_schema: dict[str, set[str]],
+    ) -> None:
+        validate_sql(sql, validation_schema)
+
+        validate_sql_semantics(
+            sql=sql,
+            question=question,
+        )
+
+    def _repair_sql_deterministically(
+        self,
+        sql: str,
+        validation_schema: dict[str, set[str]],
+    ) -> str:
+        repaired_sql = repair_column_table_reference(
+            sql=sql,
+            schema=validation_schema,
+        )
+
+        return clean_sql(repaired_sql)
+
+    def _validate_and_repair_sql(
+        self,
+        sql: str,
+        question: str,
+        schema: str,
+    ) -> str:
+        validation_schema = self._build_validation_schema()
+
         try:
-            validate_sql(sql, validation_schema)
-            return sql
-
-        except UnsafeSQLQueryError as exc:
-            logging.warning("Initial SQL rejected (%s): %s", exc, sql)
-
-            repair_prompt = build_sql_repair_prompt(
+            self._validate_sql(
                 sql=sql,
-                error=str(exc),
-                schema=schema,
+                question=question,
+                validation_schema=validation_schema,
             )
 
-            repaired_sql = self.agent.repair_sql(repair_prompt)
-            repaired_sql = clean_sql(repaired_sql)
+            return sql
 
-            logging.warning("Repaired SQL: %s", repaired_sql)
+        except (
+            UnsafeSQLQueryError,
+            SemanticSQLValidationError,
+        ) as exc:
+            validation_error = str(exc)
 
-            if is_cannot_answer(repaired_sql):
-                raise QuestionNotAnswerableError(
-                    "The model reported that the data is not available."
-                ) from exc
+            logging.warning(
+                "Initial SQL rejected (%s): %s",
+                exc,
+                sql,
+            )
 
-            # Repair is attempted only once. If the repaired SQL is still
-            # invalid, this raises UnsafeSQLQueryError and the API route
-            # converts it into a 422 response.
-            validate_sql(repaired_sql, validation_schema)
+        try:
+            repaired_sql = self._repair_sql_deterministically(
+                sql=sql,
+                validation_schema=validation_schema,
+            )
+
+            logging.warning(
+                "Deterministically repaired SQL: %s",
+                repaired_sql,
+            )
+
+            self._validate_sql(
+                sql=repaired_sql,
+                question=question,
+                validation_schema=validation_schema,
+            )
 
             return repaired_sql
 
+        except (
+            UnsafeSQLQueryError,
+            SemanticSQLValidationError,
+            ValueError,
+        ) as deterministic_exc:
+            logging.warning(
+                "Deterministic SQL repair failed (%s). Falling back to LLM repair.",
+                deterministic_exc,
+            )
+
+        repair_prompt = build_sql_repair_prompt(
+            sql=sql,
+            error=validation_error,
+            schema=schema,
+            question=question,
+        )
+
+        repaired_sql = self.agent.repair_sql(repair_prompt)
+        repaired_sql = clean_sql(repaired_sql)
+
+        logging.warning(
+            "LLM repaired SQL: %s",
+            repaired_sql,
+        )
+
+        if is_cannot_answer(repaired_sql):
+            raise QuestionNotAnswerableError(
+                "The model reported that the data is not available."
+            )
+
+        self._validate_sql(
+            sql=repaired_sql,
+            question=question,
+            validation_schema=validation_schema,
+        )
+
+        return repaired_sql
+
     def query(self, question: str) -> AIQueryResponse:
-        # Cheap deterministic guard: never send write requests to the LLM.
-        # This is a UX layer; the SQL validator remains the security boundary.
         if is_write_request(question):
             raise WriteRequestError("Write operations are not supported.")
 
@@ -81,7 +161,10 @@ class AIQueryService:
         sql = self.agent.run(prompt)
         sql = clean_sql(sql)
 
-        logging.warning("Initial generated SQL: %s", sql)
+        logging.warning(
+            "Initial generated SQL: %s",
+            sql,
+        )
 
         if is_cannot_answer(sql):
             raise QuestionNotAnswerableError(
@@ -90,11 +173,13 @@ class AIQueryService:
 
         sql = self._validate_and_repair_sql(
             sql=sql,
+            question=question,
             schema=schema,
         )
 
         try:
             result = execute_query(sql)
+
         except SQLExecutionError as exc:
             raise SQLExecutionError(
                 "AI-generated SQL query failed to execute."

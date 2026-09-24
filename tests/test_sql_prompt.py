@@ -70,3 +70,18 @@ def test_sql_prompt_includes_business_semantics():
     assert "Business semantics:" in prompt
     assert "total_sales" in prompt
     assert "sum of order_items.line_total" in prompt
+
+
+def test_sql_prompt_includes_product_category_semantics():
+    prompt = build_sql_prompt(
+        question="Which customer spent the most on Electronics last year?",
+        schema="""
+        categories(id, name)
+        products(id, name, category_id)
+        """,
+    )
+
+    assert "product_category" in prompt
+    assert "categories.name" in prompt
+    assert "products.category_id" in prompt
+    assert "Never compare a category name with products.name" in prompt

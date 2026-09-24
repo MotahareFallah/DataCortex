@@ -144,3 +144,29 @@ def test_generate_sql_with_tool_parses_json_content():
         )
 
     assert result == "SELECT SUM(total_amount) FROM orders"
+
+
+@patch("app.services.text_to_sql.LLMService")
+def test_generate_sql_prompt_defines_last_year_as_full_calendar_year(mock_llm):
+    mock_llm.return_value.generate_json.return_value = {
+        "sql": "SELECT COUNT(*) FROM orders"
+    }
+
+    service = TextToSQLService()
+
+    service.generate_sql(
+        question="How many orders were made last year?",
+        schema="orders(id, ordered_at)",
+    )
+
+    prompt = mock_llm.return_value.generate_json.call_args.args[0]
+
+    assert (
+        '"Last year" means the previous calendar year, not the last 12 months.'
+        in prompt
+    )
+    assert "a lower bound at the start of the previous calendar year" in prompt
+    assert "an upper bound at the start of the current calendar year" in prompt
+    assert "Use a half-open range: start <= date < end." in prompt
+    assert "DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 year')" in prompt
+    assert "DATE_TRUNC('year', CURRENT_DATE)" in prompt
