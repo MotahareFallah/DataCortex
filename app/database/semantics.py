@@ -19,6 +19,23 @@ BUSINESS_DEFINITIONS = {
             "and calculate sales using SUM(order_items.line_total)."
         ),
     },
+    "product_category": {
+        "definition": (
+            "A product category is identified by categories.name "
+            "and linked to products through products.category_id."
+        ),
+        "tables": ["categories", "products"],
+        "columns": [
+            "categories.id",
+            "categories.name",
+            "products.category_id",
+        ],
+        "rule": (
+            "When the question filters products by category name, always resolve "
+            "the category through categories.name and products.category_id. "
+            "Never compare a category name with products.name."
+        ),
+    },
     "order_subtotal": {
         "definition": "The value of orders.subtotal before tax.",
         "tables": ["orders"],

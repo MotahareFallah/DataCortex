@@ -31,6 +31,13 @@ a SQL SELECT query for {database_type}.
 
 Today's date is {today}.
 "Last year" means the previous calendar year, not the last 12 months.
+When filtering a date or timestamp for "last year", always use both:
+- a lower bound at the start of the previous calendar year
+- an upper bound at the start of the current calendar year
+Use a half-open range: start <= date < end.
+For PostgreSQL, use:
+date >= DATE_TRUNC('year', CURRENT_DATE - INTERVAL '1 year')
+AND date < DATE_TRUNC('year', CURRENT_DATE)
 
 Rules:
 - Generate only SELECT statements.
