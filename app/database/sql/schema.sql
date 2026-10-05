@@ -1,3 +1,9 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
+
+CREATE SCHEMA IF NOT EXISTS datacortex;
+
+
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -134,4 +140,14 @@ CREATE TABLE payments (
 
     CONSTRAINT payments_amount_positive
         CHECK (amount > 0)
+);
+
+
+CREATE TABLE datacortex.knowledge_documents (
+    id VARCHAR(100) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    metadata JSONB,
+    embedding VECTOR(384) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     postgres_password: str
     postgres_host: str
     postgres_port: int
+    postgres_schema: str = "datacortex"
 
     ollama_base_url: str
     ollama_model: str
