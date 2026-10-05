@@ -3,6 +3,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE SCHEMA IF NOT EXISTS datacortex;
 
+SET search_path TO datacortex, public;
+
 
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS order_items;
