@@ -1,5 +1,6 @@
 from sqlalchemy import inspect
 
+from app.core.config import settings
 from app.database.connection import engine
 from app.schemas.database import (
     ColumnSchema,
@@ -8,16 +9,30 @@ from app.schemas.database import (
     TableSchema,
 )
 
+EXCLUDED_TABLES = {"knowledge_documents"}
+
 
 def discover_schema() -> DatabaseSchema:
     inspector = inspect(engine)
 
     tables = {}
 
-    for table_name in inspector.get_table_names():
-        columns = inspector.get_columns(table_name)
-        primary_key = inspector.get_pk_constraint(table_name)
-        foreign_keys = inspector.get_foreign_keys(table_name)
+    for table_name in inspector.get_table_names(schema=settings.postgres_schema):
+        if table_name in EXCLUDED_TABLES:
+            continue
+
+        columns = inspector.get_columns(
+            table_name,
+            schema=settings.postgres_schema,
+        )
+        primary_key = inspector.get_pk_constraint(
+            table_name,
+            schema=settings.postgres_schema,
+        )
+        foreign_keys = inspector.get_foreign_keys(
+            table_name,
+            schema=settings.postgres_schema,
+        )
 
         tables[table_name] = TableSchema(
             columns=[

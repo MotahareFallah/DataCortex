@@ -3,6 +3,7 @@ from app.database.seed.categories import seed_categories
 from app.database.seed.customers import seed_customers
 from app.database.seed.departments import seed_departments
 from app.database.seed.employees import seed_employees
+from app.database.seed.knowledge import seed_knowledge
 from app.database.seed.order_items import seed_order_items
 from app.database.seed.orders import seed_orders
 from app.database.seed.payments import seed_payments
@@ -20,8 +21,10 @@ def main() -> None:
     seed_orders()
     seed_order_items()
     seed_payments()
+    seed_knowledge()
 
     print("Seeded 1000 records successfully.")
+    print("Knowledge documents seeded successfully.")
 
 
 if __name__ == "__main__":

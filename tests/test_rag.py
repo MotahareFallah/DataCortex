@@ -105,3 +105,22 @@ def test_semantic_search_scores_are_sorted():
     scores = [result["score"] for result in results]
 
     assert scores == sorted(scores, reverse=True)
+
+
+def test_rag_service_semantic_retrieve_uses_vector_store():
+    service = RAGService()
+
+    results = service.semantic_retrieve(
+        "money received from completed customer orders",
+        top_k=3,
+    )
+
+    assert len(results) == 3
+    assert all("score" in result for result in results)
+    assert results[0]["score"] >= results[1]["score"]
+    assert results[1]["score"] >= results[2]["score"]
+
+    result_ids = [result["id"] for result in results]
+
+    assert "sales_definition" in result_ids
+    assert "order_status" in result_ids

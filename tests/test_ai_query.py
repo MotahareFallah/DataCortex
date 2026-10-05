@@ -3,7 +3,6 @@ from unittest.mock import patch
 import pytest
 
 from app.database.query import SQLExecutionError
-from app.database.sql_validator import UnsafeSQLQueryError
 from app.schemas.database import (
     ColumnSchema,
     DatabaseSchema,
@@ -237,7 +236,6 @@ def test_ai_query_repairs_invalid_sql_and_executes_repaired_query(
         ("orders", ["total_amount"]),
     )
 
-    # The first query uses a column that does not exist, so validation fails.
     mock_agent.return_value.run.return_value = "SELECT missing_column FROM orders"
     mock_agent.return_value.repair_sql.return_value = "SELECT total_amount FROM orders"
 
@@ -259,7 +257,7 @@ def test_ai_query_repairs_invalid_sql_and_executes_repaired_query(
 @patch("app.services.ai_query.execute_query")
 @patch("app.services.ai_query.AIAgent")
 @patch("app.services.ai_query.discover_schema")
-def test_ai_query_raises_unsafe_error_when_repair_also_fails(
+def test_ai_query_raises_question_not_answerable_when_repair_also_fails(
     mock_discover_schema,
     mock_agent,
     mock_execute_query,
@@ -273,10 +271,9 @@ def test_ai_query_raises_unsafe_error_when_repair_also_fails(
 
     service = AIQueryService()
 
-    with pytest.raises(UnsafeSQLQueryError):
+    with pytest.raises(QuestionNotAnswerableError):
         service.query("How are we doing?")
 
-    # Invalid SQL must never reach the database.
     mock_execute_query.assert_not_called()
 
 
@@ -297,7 +294,7 @@ def test_ai_query_attempts_repair_only_once(
 
     service = AIQueryService()
 
-    with pytest.raises(UnsafeSQLQueryError):
+    with pytest.raises(QuestionNotAnswerableError):
         service.query("How are we doing?")
 
     mock_agent.return_value.repair_sql.assert_called_once()
@@ -311,7 +308,9 @@ def test_ai_query_raises_when_model_says_cannot_answer(
     mock_agent,
     mock_execute_query,
 ):
-    mock_discover_schema.return_value = make_schema(("customers", ["id", "name"]))
+    mock_discover_schema.return_value = make_schema(
+        ("customers", ["id", "name"]),
+    )
     mock_agent.return_value.run.return_value = "CANNOT_ANSWER"
 
     service = AIQueryService()
@@ -331,7 +330,10 @@ def test_ai_query_raises_when_repair_says_cannot_answer(
     mock_agent,
     mock_execute_query,
 ):
-    mock_discover_schema.return_value = make_schema(("orders", ["total_amount"]))
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["total_amount"]),
+    )
+
     mock_agent.return_value.run.return_value = "SELECT missing_column FROM orders"
     mock_agent.return_value.repair_sql.return_value = "CANNOT_ANSWER"
 
@@ -368,8 +370,12 @@ def test_ai_query_truncates_large_results(
     mock_agent,
     mock_execute_query,
 ):
-    mock_discover_schema.return_value = make_schema(("orders", ["id"]))
+    mock_discover_schema.return_value = make_schema(
+        ("orders", ["id"]),
+    )
+
     mock_agent.return_value.run.return_value = "SELECT id FROM orders"
+
     mock_execute_query.return_value = QueryResult(
         columns=["id"],
         rows=[{"id": i} for i in range(150)],
@@ -377,8 +383,40 @@ def test_ai_query_truncates_large_results(
     )
 
     service = AIQueryService()
+
     result = service.query("List all order ids")
 
     assert len(result.rows) == 100
     assert result.row_count == 150
     assert result.truncated is True
+
+
+@patch("app.services.ai_query.execute_query")
+@patch("app.services.ai_query.AIAgent")
+@patch("app.services.ai_query.discover_schema")
+def test_ai_query_returns_question_not_answerable_for_unknown_column(
+    mock_discover_schema,
+    mock_agent,
+    mock_execute_query,
+):
+    mock_discover_schema.return_value = make_schema(
+        ("employees", ["id", "name", "role"]),
+    )
+
+    mock_agent.return_value.run.return_value = (
+        "SELECT AVG(e.salary) AS average_salary "
+        "FROM employees e "
+        "WHERE e.salary IS NOT NULL"
+    )
+
+    mock_agent.return_value.repair_sql.return_value = (
+        "SELECT AVG(e.salary) AS average_salary FROM employees e"
+    )
+
+    service = AIQueryService()
+
+    with pytest.raises(QuestionNotAnswerableError):
+        service.query("What is the average employee salary?")
+
+    mock_execute_query.assert_not_called()
+    mock_agent.return_value.repair_sql.assert_called_once()

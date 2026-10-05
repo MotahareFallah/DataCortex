@@ -1,4 +1,5 @@
 from app.services.embedding import EmbeddingService
+from app.services.rag_repository import RAGRepository
 
 KNOWLEDGE_BASE = [
     {
@@ -28,15 +29,6 @@ KNOWLEDGE_BASE = [
 ]
 
 
-_embedding_service = EmbeddingService()
-
-
-for document in KNOWLEDGE_BASE:
-    document["embedding"] = _embedding_service.embed(
-        f"{document['title']}. {document['content']}"
-    )
-
-
 def search_knowledge(query: str) -> list[dict]:
     query_words = set(query.lower().split())
 
@@ -57,32 +49,12 @@ def semantic_search(
     query: str,
     top_k: int = 3,
 ) -> list[dict]:
-    query_embedding = _embedding_service.embed(query)
+    embedding_service = EmbeddingService()
+    repository = RAGRepository()
 
-    results = []
+    query_embedding = embedding_service.embed(query)
 
-    for document in KNOWLEDGE_BASE:
-        score = sum(
-            query_value * document_value
-            for query_value, document_value in zip(
-                query_embedding,
-                document["embedding"],
-                strict=False,
-            )
-        )
-
-        results.append(
-            {
-                "id": document["id"],
-                "title": document["title"],
-                "content": document["content"],
-                "score": score,
-            }
-        )
-
-    results.sort(
-        key=lambda document: document["score"],
-        reverse=True,
+    return repository.semantic_search(
+        query_embedding=query_embedding,
+        top_k=top_k,
     )
-
-    return results[:top_k]
