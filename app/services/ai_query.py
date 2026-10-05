@@ -16,6 +16,7 @@ from app.services.exceptions import (
     WriteRequestError,
 )
 from app.services.question_guard import is_write_request
+from app.services.rag import RAGService
 from app.services.sql_cleaner import clean_sql, is_cannot_answer
 from app.services.sql_prompt import build_sql_prompt
 from app.services.sql_repair_prompt import build_sql_repair_prompt
@@ -27,6 +28,7 @@ class AIQueryService:
     def __init__(self) -> None:
         self.agent = AIAgent()
         self.answer = AnswerService()
+        self.rag = RAGService()
 
     def _build_validation_schema(self) -> dict[str, set[str]]:
         database_schema = discover_schema()
@@ -139,11 +141,26 @@ class AIQueryService:
                 "The model reported that the data is not available."
             )
 
-        self._validate_sql(
-            sql=repaired_sql,
-            question=question,
-            validation_schema=validation_schema,
-        )
+        try:
+            self._validate_sql(
+                sql=repaired_sql,
+                question=question,
+                validation_schema=validation_schema,
+            )
+
+        except (
+            UnsafeSQLQueryError,
+            SemanticSQLValidationError,
+            ValueError,
+        ) as exc:
+            logging.warning(
+                "LLM SQL repair failed validation: %s",
+                exc,
+            )
+
+            raise QuestionNotAnswerableError(
+                "The requested data is not available in the database schema."
+            ) from exc
 
         return repaired_sql
 
@@ -153,9 +170,15 @@ class AIQueryService:
 
         schema = discover_schema().model_dump_json(indent=2)
 
+        retrieved_knowledge = self.rag.semantic_retrieve(
+            question,
+            top_k=3,
+        )
+
         prompt = build_sql_prompt(
             question=question,
             schema=schema,
+            retrieved_knowledge=retrieved_knowledge,
         )
 
         sql = self.agent.run(prompt)

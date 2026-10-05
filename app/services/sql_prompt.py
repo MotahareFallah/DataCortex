@@ -7,6 +7,7 @@ from app.database.semantics import BUSINESS_DEFINITIONS
 def build_sql_prompt(
     question: str,
     schema: str,
+    retrieved_knowledge: list[dict] | None = None,
     database_type: str = "postgresql",
 ) -> str:
     adapter = get_database_adapter(database_type)
@@ -20,6 +21,16 @@ def build_sql_prompt(
         )
         for name, details in BUSINESS_DEFINITIONS.items()
     )
+
+    retrieved_knowledge = retrieved_knowledge or []
+
+    knowledge_context = "\n".join(
+        f"- {document['title']}: {document['content']}"
+        for document in retrieved_knowledge
+    )
+
+    if not knowledge_context:
+        knowledge_context = "No additional retrieved knowledge."
 
     today = date.today().isoformat()
 
@@ -55,6 +66,8 @@ Rules:
 - Use {adapter.placeholder()} as the parameter placeholder when parameters are required.
 - When a business semantic matches the user's question, its definition and rule are mandatory.
 - Follow the business semantic rules exactly.
+- Treat retrieved business knowledge as additional context.
+- Use retrieved business knowledge when it is relevant to the user's question.
 - Do not use tables or columns that are not necessary to answer the question.
 - If the question asks for data that does not exist in the schema,
   or is too vague to map to a specific query, return exactly: CANNOT_ANSWER
@@ -69,6 +82,9 @@ Database schema:
 
 Business semantics:
 {business_semantics}
+
+Retrieved business knowledge:
+{knowledge_context}
 
 User question:
 {question}

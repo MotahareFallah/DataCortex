@@ -85,3 +85,26 @@ def test_sql_prompt_includes_product_category_semantics():
     assert "categories.name" in prompt
     assert "products.category_id" in prompt
     assert "Never compare a category name with products.name" in prompt
+
+
+def test_sql_prompt_includes_retrieved_knowledge():
+    prompt = build_sql_prompt(
+        question="What is the official definition of sales?",
+        schema="orders(id, total_amount)",
+        retrieved_knowledge=[
+            {
+                "id": "sales_definition",
+                "title": "Sales Definition",
+                "content": (
+                    "Total sales represent the total monetary value "
+                    "of completed customer orders."
+                ),
+            }
+        ],
+    )
+
+    assert "Retrieved business knowledge:" in prompt
+    assert "Sales Definition" in prompt
+    assert (
+        "Total sales represent the total monetary value of completed customer orders."
+    ) in prompt
