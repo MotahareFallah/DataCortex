@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     ollama_temperature: float = 0.0
     ollama_num_ctx: int = 8192
 
+    embedding_model: str = "all-MiniLM-L6-v2"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
