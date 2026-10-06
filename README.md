@@ -1,219 +1,46 @@
 # DataCortex
 
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17%20%2B%20pgvector-336791?logo=postgresql&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-178%20passed-brightgreen)
+![Code Style](https://img.shields.io/badge/Code%20Style-Ruff-black)
+
 **DataCortex** is an AI-powered natural-language-to-SQL backend that allows users to query relational databases using plain English.
 
-The project combines **FastAPI, PostgreSQL, SQLAlchemy, LLMs, SQL validation, business semantics, Docker, and automated testing** to build a controlled AI-to-database workflow.
-
-Instead of allowing an LLM to directly access a database, DataCortex places validation, schema awareness, business rules, and execution boundaries between the LLM and the database.
+Instead of allowing an LLM to directly access a database, DataCortex places validation, schema awareness, business rules, retrieved domain knowledge (RAG), and execution boundaries between the LLM and the database.
 
 ---
 
-## Architecture
+## 📑 Table of Contents
 
-DataCortex follows a layered architecture inspired by **Clean Architecture** principles.
-
-The system separates API handling, application services, AI/LLM integration, business semantics, database access, validation, and result formatting.
-
-```text
-                    ┌──────────────────────┐
-                    │      FastAPI API     │
-                    │   HTTP / Validation  │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │   Application Layer  │
-                    │    AIQueryService    │
-                    └──────────┬───────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                ▼
-       ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
-       │ LLM / Agent │  │   Business   │  │   Answer     │
-       │    Layer    │  │   Semantics  │  │  Formatting  │
-       └──────┬──────┘  └──────────────┘  └──────────────┘
-              │
-              ▼
-       ┌──────────────────────┐
-       │ SQL Cleaner          │
-       │ SQL Validator        │
-       │ Schema Validation    │
-       │ SQL Repair           │
-       └──────────┬───────────┘
-                  │
-                  ▼
-       ┌──────────────────────┐
-       │    Database Layer    │
-       │ Schema Discovery     │
-       │ SQL Execution        │
-       │ Database Adapters    │
-       └──────────┬───────────┘
-                  │
-                  ▼
-              PostgreSQL
-```
-
-### Main Layers
-
-**API Layer**
-
-Handles HTTP requests, validation, and API responses using FastAPI.
-
-**Application Layer**
-
-Coordinates the complete natural-language-to-database workflow through `AIQueryService`.
-
-**AI Layer**
-
-Handles LLM interaction and the experimental agent/tool-calling capabilities.
-
-**Business Semantic Layer**
-
-Defines domain-specific meanings that cannot safely be inferred from database structure alone.
-
-Examples include:
-
-* `total_sales`
-* `product_sales`
-* `order_subtotal`
-* `order_total`
-
-**Database Layer**
-
-Responsible for:
-
-* schema discovery
-* SQL execution
-* SQL validation
-* database adapters
-* database-specific behavior
-
-**Formatting Layer**
-
-Converts database results into deterministic, human-readable responses.
-
-**Infrastructure**
-
-Docker, PostgreSQL, Ollama, configuration, and local development infrastructure.
-
-This separation keeps business logic independent from HTTP handlers and makes individual components easier to test and replace.
+- [Quick Demo](#-quick-demo)
+- [Architecture](#-architecture)
+- [Core Workflow](#-core-workflow)
+- [Key Features](#-key-features)
+- [Configuration](#-configuration)
+- [Project Structure](#-project-structure)
+- [Testing & Code Quality](#-testing--code-quality)
+- [CI](#-ci)
+- [Technology Stack](#-technology-stack)
+- [Getting Started](#-getting-started)
+- [Security Principles](#-security-principles)
+- [Roadmap](#-roadmap)
+- [Engineering Goals](#-engineering-goals)
 
 ---
 
-## Testing & Code Quality
+## 🚀 Quick Demo
 
-Testing is a core part of DataCortex.
+Ask a question in plain English:
 
-The current test suite contains:
-
-```text
-143 passed
-1 dependency warning
+```bash
+curl -X POST "http://127.0.0.1:8000/ai/query" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "What are the top 5 products by total sales?"}'
 ```
 
-The tests cover multiple layers of the application, including:
-
-* API endpoints
-* SQL generation prompts
-* SQL validation
-* SQL security rules
-* SQL repair
-* database schema discovery
-* database execution
-* business semantic rules
-* result formatting
-* answer generation
-* integration-oriented database behavior
-
-Example:
-
-```text
-pytest -q
-
-143 passed, 1 warning
-```
-
-The project also uses **Ruff** and **pre-commit** for code quality.
-
-```text
-Ruff checks       ✓
-Ruff formatting   ✓
-Pre-commit hooks  ✓
-```
-
-The goal is to keep the AI workflow testable and deterministic wherever possible, especially around SQL validation, business rules, database execution, and result formatting.
-
----
-
-## Core Flow
-
-A user can ask a question such as:
-
-```text
-What are the top 5 products by total sales?
-```
-
-The request follows this pipeline:
-
-```text
-User Question
-      │
-      ▼
-   FastAPI
-      │
-      ▼
- Schema Discovery
-      │
-      ▼
-Business Semantics
-      │
-      ▼
-    LLM
-      │
-      ▼
- Text-to-SQL
-      │
-      ▼
- SQL Cleaning
-      │
-      ▼
- SQL Validation
-      │
-      ├── Invalid ──► SQL Repair ──► Validation
-      │
-      ▼
- SQL Execution
-      │
-      ▼
- PostgreSQL
-      │
-      ▼
-Deterministic Result Formatting
-      │
-      ▼
-    API Response
-```
-
-The LLM generates SQL, but generated SQL is treated as **untrusted input**.
-
-The application validates the query before execution.
-
----
-
-## AI Capabilities
-
-### 1. Natural Language to SQL
-
-DataCortex converts natural-language questions into SQL queries.
-
-Example:
-
-```text
-User:
-What are the top 5 products by total sales?
-```
-
-The LLM can generate:
+**Generated SQL:**
 
 ```sql
 SELECT
@@ -227,323 +54,181 @@ ORDER BY total_sales DESC
 LIMIT 5;
 ```
 
----
+**Response:**
 
-### 2. Schema Discovery
-
-The LLM receives information about the available database structure instead of being allowed to assume arbitrary tables or columns.
-
-Example schema information includes:
-
-```text
-products
-- id
-- name
-- price
-- cost
-- category_id
-
-order_items
-- id
-- order_id
-- product_id
-- quantity
-- unit_price
-- discount_amount
-- line_total
-
-orders
-- id
-- customer_id
-- status
-- ordered_at
-- subtotal
-- tax_amount
-- total_amount
+```json
+{
+  "question": "What are the top 5 products by total sales?",
+  "sql": "SELECT p.name, SUM(oi.line_total) AS total_sales FROM products p JOIN order_items oi ON p.id = oi.product_id GROUP BY p.name ORDER BY total_sales DESC LIMIT 5;",
+  "columns": ["name", "total_sales"],
+  "rows": [
+    {"name": "User-friendly multimedia firmware", "total_sales": "31642.81"}
+  ],
+  "row_count": 5,
+  "answer": "1. User-friendly multimedia firmware — 31642.81",
+  "truncated": false
+}
 ```
 
-This reduces hallucinated tables and columns during SQL generation.
+The response is shortened for readability; the actual API returns all rows in the result set, up to the configured response row cap.
 
 ---
 
-## Business Semantic Layer
+## 🏗 Architecture
 
-Database schemas describe **how data is stored**, but they do not necessarily describe **what business concepts mean**.
+DataCortex follows a layered architecture inspired by **Clean Architecture** principles, keeping business logic independent from HTTP handlers and AI components.
 
-For example, the database contains:
+```mermaid
+graph TD
+    A[FastAPI API Layer<br/>HTTP & Validation] --> B[Application Layer<br/>AIQueryService]
+    B --> C[LLM / Agent Layer]
+    B --> D[Business Semantics]
+    B --> E[RAG Layer<br/>pgvector]
+    B --> F[Answer Formatting]
+    C --> G[SQL Cleaner, Validator & Repair]
+    G --> H[Database Layer<br/>Schema Discovery & Execution]
+    H --> I[(PostgreSQL + pgvector)]
 
-```text
-products.price
-order_items.unit_price
-order_items.line_total
-orders.subtotal
-orders.total_amount
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef db fill:#336791,stroke:#fff,stroke-width:2px,color:#fff;
+    class I db;
 ```
 
-A question such as:
+### Main Layers
 
-```text
-What are the total sales?
-```
-
-cannot safely be answered only from column names.
-
-DataCortex therefore defines explicit business semantics.
-
-### Example
-
-```text
-total_sales
-    = SUM(order_items.line_total)
-```
-
-The system explicitly prevents the LLM from interpreting total sales as:
-
-```text
-SUM(products.price)
-```
-
-or:
-
-```text
-SUM(orders.total_amount)
-```
-
-when the business definition requires order-item sales.
-
-This semantic layer provides domain knowledge that sits between database schema discovery and SQL generation.
+- **API Layer:** Handles HTTP requests, validation, and responses using FastAPI.
+- **Application Layer:** Coordinates the complete natural-language-to-database workflow through `AIQueryService`.
+- **AI Layer:** Handles LLM interaction, prompt building, and the experimental agent/tool-calling capabilities.
+- **RAG Layer:** Embeds the user's question and retrieves relevant business knowledge from PostgreSQL with pgvector.
+- **Business Semantic Layer:** Defines domain-specific meanings that cannot safely be inferred from the database structure alone (for example `total_sales`, `product_sales`, `order_subtotal`, `order_total`).
+- **Database Layer:** Schema discovery, SQL execution, SQL validation, database adapters, and database-specific behavior.
+- **Formatting Layer:** Converts database results into deterministic, human-readable responses.
+- **Infrastructure:** Docker, PostgreSQL with pgvector, Ollama, configuration, and local development tooling.
 
 ---
 
-## SQL Validation
+## 🔄 Core Workflow
 
-LLM-generated SQL is treated as untrusted input.
-
-Before execution, DataCortex validates the generated query.
-
-The validation layer checks that the query:
-
-* is a `SELECT` statement
-* does not contain destructive SQL operations
-* uses allowed tables
-* uses allowed columns
-* follows database schema constraints
-* does not violate configured SQL safety rules
-
-The system rejects statements such as:
-
-```sql
-DROP TABLE products;
-```
-
-```sql
-DELETE FROM orders;
-```
-
-```sql
-UPDATE products SET price = 0;
-```
-
-The database should never rely on the LLM to enforce its own security boundaries.
+1. **User Question:** FastAPI receives the request.
+2. **Question Guards:** Write requests and unanswerable questions are rejected early.
+3. **Schema Discovery:** The allowed tables and columns are read from the configured schema.
+4. **Business Semantics:** Explicit business rules are injected into the prompt.
+5. **RAG Retrieval:** Relevant business knowledge is found by cosine similarity.
+6. **LLM Text-to-SQL:** The LLM generates a SQL query, or `CANNOT_ANSWER` if the data does not exist.
+7. **SQL Cleaning & Validation:** The generated SQL is treated as *untrusted input* and validated against the schema and the security and semantic rules.
+8. **SQL Repair:** If validation fails, a deterministic repair is attempted first, then an LLM repair prompt. The repaired query must pass validation again.
+9. **Execution:** The validated query runs on PostgreSQL.
+10. **Deterministic Formatting:** Results are turned into a readable answer *without* asking the LLM to summarize the data.
 
 ---
 
-## SQL Repair
+## 🔑 Key Features
 
-If generated SQL fails validation, DataCortex can send the validation error back to the LLM through a dedicated SQL repair prompt.
+### 🛡️ Strict SQL Validation
+
+Generated SQL is never executed blindly. The validator checks that the query:
+
+- is a `SELECT` statement
+- contains no destructive operations (`DROP`, `DELETE`, `UPDATE`, ...)
+- uses only tables and columns that exist in the discovered schema
+- respects the business semantic rules
+
+Write requests are also rejected earlier, at the question level, before any SQL is generated. If both repair attempts fail, the API reports that the requested data is not available instead of executing unvalidated SQL.
+
+### 📖 Business Semantic Layer
+
+Database schemas describe *how data is stored*, not *what business concepts mean*. For example, "total sales" cannot be answered safely from column names alone, because the database contains `products.price`, `order_items.line_total`, `orders.subtotal`, and `orders.total_amount`.
+
+DataCortex defines it explicitly:
 
 ```text
-Generated SQL
-     │
-     ▼
- Validation
-     │
-     ├── Valid ───────► Execute
-     │
-     ▼
- Validation Error
-     │
-     ▼
- Repair Prompt
-     │
-     ▼
- LLM
-     │
-     ▼
- Corrected SQL
-     │
-     ▼
- Validation Again
+total_sales = SUM(order_items.line_total)
 ```
 
-The repaired query must pass validation before it can reach the database.
+The LLM is prevented from interpreting it as `SUM(products.price)` or `SUM(orders.total_amount)`.
 
----
+### 🧠 Retrieval-Augmented Generation (RAG)
 
-## Deterministic Answers
+```text
+Knowledge documents
+        │
+        ▼
+ Embedding (all-MiniLM-L6-v2, 384 dimensions)
+        │
+        ▼
+ datacortex.knowledge_documents (VECTOR(384))
+        │
+        ▼
+ Cosine-distance search for the user's question
+        │
+        ▼
+ Top-k documents above the similarity threshold
+        │
+        ▼
+ Added to the SQL generation prompt
+```
 
-The final response is generated from the database result rather than asking the LLM to summarize arbitrary database output.
+- Knowledge documents are stored with an upsert, so seeding is repeatable.
+- Similarity is `1 - cosine_distance`. `RAGService` keeps results at or above a configurable threshold (default `0.30`, chosen to match the score range of the default model).
+- The model is configurable through `EMBEDDING_MODEL`. The `VECTOR(384)` column must match the model's output size, and documents must be re-seeded after changing the model.
+- The embedding model is loaded once per process and shared by every `EmbeddingService` instance.
+- Retrieved knowledge is supporting context. Business semantics remain mandatory rules.
 
-For example:
+### 🔍 Entity Resolution
+
+Maps natural-language references to database entities. For example, "Apple" can be resolved to `Apple Inc.`, `Apple Store`, or `Apple Services` using text normalization and semantic matching with a similarity threshold, or to no match when nothing is close enough.
+
+### ✅ Deterministic Answers
+
+The final response is generated from the database result rather than from an LLM summary:
 
 ```text
 1. User-friendly multimedia firmware — 31642.81
 2. Enhanced didactic moratorium — 24842.32
 3. Polarized needs-based Graphic Interface — 22509.07
-4. Decentralized executive installation — 20229.52
-5. Self-enabling uniform model — 18539.76
 ```
 
-This keeps the final formatting predictable and reduces unnecessary LLM usage after the database query has already produced the authoritative result.
+This keeps formatting predictable and avoids unnecessary LLM usage after the database has produced the authoritative result.
+
+### 🛠 Experimental Agent & Tool Calling
+
+The project includes a foundation for exposing database operations as tools to an LLM-based agent. The main production path deliberately uses the deterministic Text-to-SQL → Validation → Execution pipeline instead of depending on tool selection by a small local model.
+
+### 🗄 Database Abstraction
+
+A database adapter layer keeps database-specific SQL behavior replaceable. PostgreSQL is the only database with end-to-end support today. The abstraction contains adapter concepts for MySQL and SQL Server, but the project does not claim production support for them.
+
+### 🤖 Local LLM
+
+The local development setup uses Ollama with Qwen 2.5 Coder 1.5B for SQL generation and repair. The LLM sits behind a service layer, so the model or provider can be replaced (other local models, OpenAI-compatible APIs, hosted providers) without changing the rest of the application.
 
 ---
 
-## Experimental Agent & Tool Calling
+## ⚙️ Configuration
 
-DataCortex also contains an experimental agent/tool-calling implementation.
+Configuration is read from environment variables, with a local `.env` file as a fallback. Priority: environment variables, then `.env`, then the defaults in `app/core/config.py`.
 
-The project includes the ability to represent database operations as tools and expose them to an LLM-based agent.
+| Variable             | Required | Default            | Description                              |
+| :------------------- | :------: | :----------------- | :--------------------------------------- |
+| `APP_NAME`           | yes      |                    | Application name                         |
+| `APP_VERSION`        | yes      |                    | Application version                      |
+| `POSTGRES_DB`        | yes      |                    | Database name                            |
+| `POSTGRES_USER`      | yes      |                    | Database user                            |
+| `POSTGRES_PASSWORD`  | yes      |                    | Database password                        |
+| `POSTGRES_HOST`      | yes      |                    | Database host                            |
+| `POSTGRES_PORT`      | yes      |                    | Database port                            |
+| `POSTGRES_SCHEMA`    | no       | `datacortex`       | Schema that holds the application tables |
+| `OLLAMA_BASE_URL`    | yes      |                    | Ollama server URL                        |
+| `OLLAMA_MODEL`       | yes      |                    | Ollama model name                        |
+| `OLLAMA_TEMPERATURE` | no       | `0.0`              | Sampling temperature                     |
+| `OLLAMA_NUM_CTX`     | no       | `8192`             | Context window size                      |
+| `EMBEDDING_MODEL`    | no       | `all-MiniLM-L6-v2` | Embedding model used for RAG             |
 
-However, the main production query path currently uses:
-
-```text
-Natural Language
-       ↓
-Text-to-SQL
-       ↓
-Validation
-       ↓
-Execution
-```
-
-rather than depending on unreliable tool selection from a small local model.
-
-Tool calling is therefore treated as an **experimental agent capability** and a foundation for future iterations.
-
----
-
-## Local LLM
-
-The current local development setup uses:
-
-```text
-Ollama
-└── Qwen 2.5 Coder 1.5B
-```
-
-The local model is used for SQL generation and SQL repair.
-
-The architecture keeps the LLM integration behind a service layer so that the model can be replaced without changing the rest of the application.
-
-Possible future providers include:
-
-* local models
-* OpenAI-compatible APIs
-* other hosted LLM providers
+The application connects with `search_path` set to the configured schema, so table names in generated SQL resolve to the application schema regardless of the database user's name. Never commit secrets: keep credentials in `.env` (see `.env.example`) or in the environment.
 
 ---
 
-## Database Abstraction
-
-DataCortex introduces a database adapter layer to avoid tightly coupling database-specific behavior to the application layer.
-
-The current primary execution database is:
-
-```text
-PostgreSQL
-```
-
-The architecture also contains database-specific adapter concepts for future support of other relational databases such as:
-
-```text
-PostgreSQL
-MySQL
-SQL Server
-```
-
-The project does not currently claim complete end-to-end production support for every listed database.
-
-The abstraction is intended to make database-specific SQL behavior replaceable without rewriting the application layer.
-
----
-
-## RAG & Embeddings
-
-The project includes the foundation for retrieval and semantic capabilities that can be used to improve AI-driven database interaction.
-
-Potential use cases include:
-
-* retrieving relevant schema information
-* retrieving business definitions
-* retrieving documentation
-* grounding SQL generation with domain knowledge
-* semantic matching of database entities
-
-These capabilities are part of the project's broader AI architecture and are not required by the primary Text-to-SQL execution path.
-
----
-
-## Entity Resolution
-
-Entity resolution is another planned capability for handling natural-language references to database entities.
-
-For example, a user might ask:
-
-```text
-Show sales for Apple.
-```
-
-while the database may contain:
-
-```text
-Apple Inc.
-Apple Store
-Apple Services
-```
-
-A future entity-resolution layer can determine which database entity the user actually means before generating SQL.
-
-This is particularly useful when natural language and database naming conventions do not match exactly.
-
----
-
-## Security Principles
-
-DataCortex treats AI-generated SQL as untrusted input.
-
-The security model is based on multiple layers:
-
-```text
-LLM Output
-    │
-    ▼
-SQL Cleaning
-    │
-    ▼
-SQL Validation
-    │
-    ▼
-Schema Validation
-    │
-    ▼
-Database Execution
-```
-
-Important principles include:
-
-* allow only intended SQL operations
-* validate generated SQL before execution
-* validate tables and columns against discovered schema
-* avoid trusting LLM-generated identifiers
-* keep database credentials outside source control
-* use environment variables for configuration
-* isolate infrastructure using Docker where appropriate
-
-AI-generated code should never be considered safe simply because it was generated by an LLM.
-
----
-
-## Project Structure
+## 📁 Project Structure
 
 ```text
 DataCortex/
@@ -551,330 +236,226 @@ DataCortex/
 ├── app/
 │   ├── api/
 │   │   └── routes/
-│   │       └── query.py
+│   │
+│   ├── core/
+│   │   └── config.py
 │   │
 │   ├── database/
-│   │   ├── database.py
 │   │   ├── connection.py
+│   │   ├── database.py
+│   │   ├── dialect.py
+│   │   ├── health.py
 │   │   ├── query.py
+│   │   ├── rag_models.py
+│   │   ├── reset.py
 │   │   ├── schema.py
+│   │   ├── security.py
 │   │   ├── semantics.py
-│   │   └── sql_validator.py
+│   │   ├── sql_repair.py
+│   │   ├── sql_semantic_validator.py
+│   │   ├── sql_validator.py
+│   │   ├── seed/
+│   │   └── sql/
+│   │       └── schema.sql
 │   │
 │   ├── schemas/
-│   │   └── ai_query.py
+│   │   ├── ai_query.py
+│   │   ├── database.py
+│   │   ├── knowledge.py
+│   │   └── query.py
 │   │
 │   ├── services/
 │   │   ├── agent.py
 │   │   ├── ai_query.py
 │   │   ├── answer.py
+│   │   ├── embedding.py
+│   │   ├── entity_resolution.py
+│   │   ├── exceptions.py
+│   │   ├── knowledge.py
 │   │   ├── llm.py
+│   │   ├── question_guard.py
+│   │   ├── rag.py
+│   │   ├── rag_repository.py
 │   │   ├── result_formatter.py
 │   │   ├── sql_cleaner.py
 │   │   ├── sql_prompt.py
 │   │   ├── sql_repair_prompt.py
+│   │   ├── text_to_sql.py
 │   │   └── tools.py
-│   │
-│   ├── core/
-│   │   └── config.py
 │   │
 │   └── main.py
 │
 ├── tests/
-│   ├── ...
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
+├── .github/workflows/ci.yml
 ├── Dockerfile
 ├── compose.yaml
+├── pyproject.toml
 ├── requirements.txt
-├── .dockerignore
-├── .gitignore
 └── README.md
 ```
 
 ---
 
-## Example
+## 🧪 Testing & Code Quality
 
-### Request
-
-```http
-POST /ai/query
-```
-
-```json
-{
-  "question": "What are the top 5 products by total sales?"
-}
-```
-
-### Generated SQL
-
-```sql
-SELECT
-    p.name,
-    SUM(oi.line_total) AS total_sales
-FROM products p
-JOIN order_items oi
-    ON p.id = oi.product_id
-GROUP BY p.name
-ORDER BY total_sales DESC
-LIMIT 5;
-```
-
-### Response
-
-```json
-{
-  "question": "What are the top 5 products by total sales?",
-  "sql": "SELECT p.name, SUM(oi.line_total) AS total_sales FROM products p JOIN order_items oi ON p.id = oi.product_id GROUP BY p.name ORDER BY total_sales DESC LIMIT 5;",
-  "columns": [
-    "name",
-    "total_sales"
-  ],
-  "rows": [
-    {
-      "name": "User-friendly multimedia firmware",
-      "total_sales": "31642.81"
-    }
-  ],
-  "row_count": 5,
-  "answer": "1. User-friendly multimedia firmware — 31642.81"
-}
-```
-
-The response above is shortened for readability; the actual API returns all rows in the result set.
-
----
-
-## Technology Stack
-
-| Technology     | Purpose                     |
-| -------------- | --------------------------- |
-| Python         | Core application language   |
-| FastAPI        | REST API                    |
-| PostgreSQL     | Primary relational database |
-| SQLAlchemy     | Database abstraction        |
-| psycopg        | PostgreSQL driver           |
-| Ollama         | Local LLM runtime           |
-| Qwen 2.5 Coder | Local SQL generation model  |
-| SQLGlot        | SQL parsing/analysis        |
-| Pydantic       | Data validation             |
-| Docker         | Containerization            |
-| Pytest         | Automated testing           |
-| Ruff           | Linting and formatting      |
-| Pre-commit     | Code quality automation     |
-| GitHub Actions | CI                          |
-
----
-
-## Running Locally
-
-### 1. Clone the repository
+Testing is a core pillar of DataCortex. The suite covers API endpoints, SQL generation prompts, SQL validation (security and semantic rules), SQL repair, schema discovery, database execution, business semantics, RAG retrieval and the vector store repository, entity resolution, question guards, result formatting, and answer generation.
 
 ```bash
-git clone git@github.com:MotaharehFallah/DataCortex.git
-cd DataCortex
+$ pytest -q
+178 passed, 1 warning
 ```
 
-### 2. Create a virtual environment
+The embedding model is loaded once and cached, so the full suite runs in about 20 seconds on a laptop CPU.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
+The tests run against a real PostgreSQL database, so the schema must be created and seeded first (see [Getting Started](#-getting-started)).
 
-### 3. Install dependencies
+**Code quality automation:**
 
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure environment variables
-
-Create a `.env` file based on:
-
-```text
-.env.example
-```
-
-Do not commit secrets to Git.
-
-### 5. Start PostgreSQL
-
-Using Docker:
-
-```bash
-docker compose up -d db
-```
-
-### 6. Start Ollama
-
-Make the local Ollama server available to the application:
-
-```bash
-OLLAMA_HOST=0.0.0.0:11434 ollama serve
-```
-
-Then make sure the required model is available:
-
-```bash
-ollama list
-```
-
-### 7. Start the API
-
-```bash
-uvicorn app.main:app --reload
-```
-
-The API will be available at:
-
-```text
-http://127.0.0.1:8000
-```
-
-FastAPI documentation:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-## Running with Docker
-
-Build and start the services:
-
-```bash
-docker compose up --build
-```
-
-The application container runs the FastAPI service and connects to PostgreSQL through the Docker network.
-
-The local LLM can be accessed through the host Ollama service when configured appropriately.
-
----
-
-## Running Tests
-
-Run the complete test suite:
-
-```bash
-pytest -q
-```
-
-Current result:
-
-```text
-143 passed, 1 warning
-```
-
-Run Ruff:
+- ✅ **Ruff:** linting and formatting
+- ✅ **Pre-commit:** hooks that catch issues before they are committed
+- ✅ **GitHub Actions:** CI on every push and pull request to `main`
 
 ```bash
 ruff check .
 ruff format --check .
-```
-
-Run all pre-commit hooks:
-
-```bash
 pre-commit run --all-files
 ```
 
 ---
 
-## CI
+## 🔁 CI
 
-GitHub Actions runs automated quality checks for the project.
+GitHub Actions runs on pushes and pull requests to `main`. The workflow:
 
-The CI workflow includes:
-
-* dependency installation
-* test execution
-* linting
-* formatting checks
-
-This helps prevent broken code from being pushed without verification.
+1. starts a PostgreSQL service with pgvector (`pgvector/pgvector:pg17`)
+2. installs dependencies
+3. runs Ruff lint and format checks
+4. creates the database schema from `schema.sql`
+5. seeds the database, including knowledge documents and embeddings
+6. runs the test suite
 
 ---
 
-## Current Status
+## 🛠 Technology Stack
 
-DataCortex currently demonstrates a complete AI-assisted database query workflow:
+| Technology                | Purpose                                     |
+| :------------------------ | :------------------------------------------ |
+| **Python**                | Core application language                   |
+| **FastAPI**               | REST API                                    |
+| **PostgreSQL + pgvector** | Primary database and vector similarity search |
+| **SQLAlchemy / psycopg**  | Database abstraction and driver             |
+| **sentence-transformers** | Local embeddings (`all-MiniLM-L6-v2`)       |
+| **Ollama / Qwen 2.5 Coder** | Local LLM runtime for SQL generation      |
+| **SQLGlot**               | SQL parsing and analysis                    |
+| **Pydantic**              | Data validation and settings management     |
+| **Docker / Compose**      | Containerized local development             |
+| **Pytest**                | Automated testing                           |
+| **Ruff / Pre-commit**     | Code quality and formatting                 |
+| **GitHub Actions**        | CI                                          |
 
-```text
-Natural Language
-       ↓
-Schema Discovery
-       ↓
-Business Semantics
-       ↓
-LLM Text-to-SQL
-       ↓
-SQL Cleaning
-       ↓
-SQL Validation
-       ↓
-SQL Repair
-       ↓
-PostgreSQL Execution
-       ↓
-Deterministic Formatting
-       ↓
-API Response
+---
+
+## 🚀 Getting Started
+
+### 1. Clone and set up
+
+```bash
+git clone git@github.com:MotahareFallah/DataCortex.git
+cd DataCortex
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-The main workflow is implemented and tested.
+### 2. Configure environment variables
 
-The project also contains experimental foundations for:
+Create a `.env` file based on `.env.example` and update the database credentials and Ollama settings. Do not commit secrets to Git.
 
-* agent workflows
-* tool calling
-* RAG
-* embeddings
-* entity resolution
-* database abstraction
+### 3. Start PostgreSQL
 
-These components are intentionally separated from the core execution path so that the main system remains predictable and testable.
+The database image includes the pgvector extension:
+
+```bash
+docker compose up -d db
+```
+
+### 4. Create the schema and seed the data
+
+Create the extension, the `datacortex` schema, and all tables:
+
+```bash
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < app/database/sql/schema.sql
+```
+
+Seed the sample data and the knowledge documents. This also computes the document embeddings, so the first run downloads the embedding model:
+
+```bash
+python -m app.database.seed
+```
+
+### 5. Start Ollama
+
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+ollama list   # make sure the required model is available
+```
+
+### 6. Start the API
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The API is available at `http://127.0.0.1:8000`, and the interactive documentation at `http://127.0.0.1:8000/docs`.
+
+### Running with Docker
+
+```bash
+docker compose up --build
+```
+
+The application container runs the FastAPI service and connects to PostgreSQL through the Docker network. The schema and seed steps above still need to be run once against the database. The container reaches the host Ollama service through `host.docker.internal`.
 
 ---
 
-## Roadmap
+## 🔒 Security Principles
 
-Future development may include:
+AI-generated SQL is never considered safe simply because an LLM produced it.
 
-* authentication and authorization
-* query caching
-* streaming responses
-* richer database adapters
-* improved entity resolution
-* production-grade vector database integration
-* advanced RAG workflows
-* query observability and tracing
-* query cost estimation
-* rate limiting
-* web-based analytics interface
-* BI-oriented natural-language querying
+```text
+LLM Output → SQL Cleaning → SQL Validation → Schema Validation → Database Execution
+```
+
+- allow only intended SQL operations
+- validate generated SQL before execution
+- validate tables and columns against the discovered schema
+- never trust LLM-generated identifiers
+- keep database credentials outside source control
+- use environment variables for configuration
+- isolate infrastructure with Docker where appropriate
+
+---
+
+## 🗺 Roadmap
+
+- [ ] Authentication and authorization
+- [ ] Query caching and performance optimization
+- [ ] Streaming responses
+- [ ] Richer database adapters
+- [ ] Richer knowledge ingestion for RAG (documents, schema descriptions)
+- [ ] Advanced RAG workflows (hybrid search, re-ranking)
+- [ ] Query observability, tracing, and cost estimation
+- [ ] Rate limiting
+- [ ] Web-based analytics interface
 
 ---
 
-## Engineering Goals
+## 🎯 Engineering Goals
 
-DataCortex is designed around several engineering principles:
-
-* **AI should be constrained by application rules.**
-* **LLM output should be treated as untrusted input.**
-* **Business semantics should be explicit rather than inferred blindly.**
-* **Database access should remain isolated behind application boundaries.**
-* **AI components should be replaceable.**
-* **Critical behavior should be covered by automated tests.**
-* **Deterministic operations should not unnecessarily depend on an LLM.**
-
-The project focuses on combining AI capabilities with conventional backend engineering practices rather than treating the LLM as the entire application.
-
----
+1. **AI is constrained by application rules.** The LLM is a tool, not the source of truth.
+2. **LLM output is untrusted input.** It must be validated before touching the database.
+3. **Business semantics are explicit.** They are enforced programmatically, not inferred blindly.
+4. **Database access stays behind application boundaries.**
+5. **AI components are replaceable.**
+6. **Deterministic over probabilistic.** Validation and formatting rely on code, not LLM guesses.
+7. **Critical behavior is covered by automated tests.**
