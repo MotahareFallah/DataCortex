@@ -108,3 +108,16 @@ def test_sql_prompt_includes_retrieved_knowledge():
     assert (
         "Total sales represent the total monetary value of completed customer orders."
     ) in prompt
+
+
+def test_sql_prompt_includes_cannot_answer_examples():
+    prompt = build_sql_prompt(
+        question="anything",
+        schema="orders(id, total_amount)",
+    )
+
+    assert "Examples:" in prompt
+    assert "What is the employee vacation policy?" in prompt
+    assert "SQL query: CANNOT_ANSWER" in prompt
+    assert "cannot be answered with SQL" in prompt
+    assert "SELECT COUNT(*) FROM customers;" in prompt

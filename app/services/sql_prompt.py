@@ -71,11 +71,26 @@ Rules:
 - Do not use tables or columns that are not necessary to answer the question.
 - If the question asks for data that does not exist in the schema,
   or is too vague to map to a specific query, return exactly: CANNOT_ANSWER
+- Questions about policies, rules, procedures, or documents that are not
+  stored as data in the schema cannot be answered with SQL.
+  Return exactly: CANNOT_ANSWER
 - Never use a column alias that names data the schema does not contain
   (for example, do not alias products.name as favorite_color).
 - Return only the SQL query, or CANNOT_ANSWER.
 - Do not use markdown.
 - Do not explain the query.
+
+Examples:
+
+Question: What is the employee vacation policy?
+SQL query: CANNOT_ANSWER
+
+Question: What is the weather in Berlin today?
+SQL query: CANNOT_ANSWER
+
+Example schema: customers(id, name)
+Question: How many customers do we have?
+SQL query: SELECT COUNT(*) FROM customers;
 
 Database schema:
 {schema}
